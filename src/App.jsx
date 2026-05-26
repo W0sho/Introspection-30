@@ -272,7 +272,7 @@ const App = () => {
     };
 
     // Bruk offentlig modell (1.5-flash) for Vercel, og preview-modell for testmiljøet
-    const modelName = apiKey ? "gemini-1.5-flash" : "gemini-2.5-flash-preview-09-2025";
+    const modelName = "gemini-2.5-flash";
     const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`;
     
     let attempt = 0; let delay = 1000; let success = false; let lastErrorDetails = "";
