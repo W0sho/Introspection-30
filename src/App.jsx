@@ -8,7 +8,7 @@ import {
 // For å hente API-nøkkelen fra .env-filen (lokalt) eller Vercel (publisert)
 // Bruk import.meta.env.VITE_GEMINI_API_KEY lokalt.
 // Her i testmiljøet må den imidlertid være en tom streng for at kompilatoren ikke skal krasje.
-const apiKey = ""; // import.meta.env.VITE_GEMINI_API_KEY; 
+const apiKey = import.meta.env.VITE_GEMINI_API_KEY; 
 
 const TraitRow = ({ trait, isShortTest }) => {
   const [isExpanded, setIsExpanded] = useState(false);
