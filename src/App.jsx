@@ -281,7 +281,7 @@ const App = () => {
       try {
         setLoadingAttempt(attempt + 1);
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 15000);
+        const timeoutId = setTimeout(() => controller.abort(), 60000);
         const response = await fetch(apiUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload), signal: controller.signal });
         clearTimeout(timeoutId);
         let data; try { data = await response.json(); } catch (e) { throw new Error(`Nettverksfeil. Svar: ${response.status}`); }
