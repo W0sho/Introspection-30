@@ -5,9 +5,10 @@ import {
   Check, Zap, FileText, Compass, BarChart, ArrowLeft
 } from 'lucide-react';
 
-// API-nøkkel injiseres automatisk av testmiljøet her i forhåndsvisningen.
-// Ved publisering lokalt/Vercel kan du bytte dette til: const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
-const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+// For å hente API-nøkkelen fra .env-filen (lokalt) eller Vercel (publisert)
+// Bruk import.meta.env.VITE_GEMINI_API_KEY lokalt.
+// Her i testmiljøet må den imidlertid være en tom streng for at kompilatoren ikke skal krasje.
+const apiKey = ""; // import.meta.env.VITE_GEMINI_API_KEY; 
 
 const TraitRow = ({ trait, isShortTest }) => {
   const [isExpanded, setIsExpanded] = useState(false);
@@ -258,7 +259,10 @@ const App = () => {
       }
     };
 
-    const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
+    // Bruk offentlig modell (1.5-flash) for Vercel, og preview-modell for testmiljøet
+    const modelName = apiKey ? "gemini-1.5-flash" : "gemini-2.5-flash-preview-09-2025";
+    const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`;
+    
     let attempt = 0; let delay = 1000; let success = false; let lastErrorDetails = "";
 
     while (attempt < 3 && !success) {
