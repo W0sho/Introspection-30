@@ -7,7 +7,7 @@ import {
 
 // API-nøkkel injiseres automatisk av testmiljøet her i forhåndsvisningen.
 // Ved publisering lokalt/Vercel kan du bytte dette til: const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
-const apiKey = ""; 
+const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
 
 const TraitRow = ({ trait, isShortTest }) => {
   const [isExpanded, setIsExpanded] = useState(false);
