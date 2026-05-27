@@ -360,8 +360,16 @@ const App = () => {
       }
     }
   };
+  
+  function generateRandomTest() {
+    const randomAnswers = Array.from({ length: 150 }, () => Math.floor(Math.random() * 5) + 1);
+    setTestType('extended_riasec');
+    setMaxQuestions(150);
+    setIncludeRiasec(true);
+    generateInsights(randomAnswers, true);
+  }
 
-  const startTest = (type, resume = false) => {
+  function startTest(type, resume = false) {
     if (resume && savedProgress) {
       setTestType(savedProgress.type); setMaxQuestions(savedProgress.maxQuestions); setIncludeRiasec(savedProgress.includeRiasec);
       setAnswers(savedProgress.answers); setCurrentQuestionIdx(savedProgress.currentQuestionIdx);
@@ -372,7 +380,7 @@ const App = () => {
       setCurrentQuestionIdx(1); setAnswers([]);
     }
     setAppState('testing');
-  };
+  }
 
   const handleAnswer = (value) => {
     if (isTransitioning) return;
@@ -451,6 +459,12 @@ const App = () => {
               <FileText className="w-6 h-6 text-indigo-200" /> <span className="text-left text-base md:text-lg">Komplett personlighetsprofil (30 fasetter)</span>
             </button>
           </div>
+          <button 
+        onClick={generateRandomTest} 
+        className="mt-8 text-xs font-mono text-gray-400 hover:text-indigo-600 transition-colors w-full text-center"
+      >
+        [ DEV: Generer tilfeldig test (150 svar) ]
+      </button>
         </div>
       </div>
     );
