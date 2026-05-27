@@ -8,6 +8,7 @@ import {
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from 'firebase/auth';
 import { getFirestore, doc, setDoc, getDoc } from 'firebase/firestore';
+import html2pdf from 'html2pdf.js';
 
 // Initialiser Firebase
 let auth = null;
@@ -120,66 +121,28 @@ const App = () => {
   const [isAnalyzingCompat, setIsAnalyzingCompat] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
 
-  // 1. Initialisering (URL Params, Auth, Lokal Cache)
+// 1. Initialisering (URL Params, Lokal Cache)
   useEffect(() => {
-    // Sjekk URL for match parameter
     const params = new URLSearchParams(window.location.search);
     const mId = params.get('match');
     if (mId) setMatchId(mId);
 
-    // Sjekk LocalStorage for påbegynt test
+    // Hent påbegynt test
     const saved = localStorage.getItem('introspectionProgress');
     if (saved) setSavedProgress(JSON.parse(saved));
 
-    if (!auth) {
-      setLoadingCache(false);
-      return;
+    // Hent ferdig testresultat
+    const savedResults = localStorage.getItem('introspectionResults');
+    if (savedResults && !mId) {
+      const data = JSON.parse(savedResults);
+      setResults(data.results);
+      setTestType(data.testType);
+      setIncludeRiasec(data.includeRiasec);
+      setAppState('dashboard');
     }
     
-    const initAuth = async () => {
-      try {
-        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) await signInWithCustomToken(auth, __initial_auth_token);
-        else await signInAnonymously(auth);
-      } catch (error) { console.error("Autentiseringsfeil:", error); setLoadingCache(false); }
-    };
-    initAuth();
-    
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-      setUser(currentUser);
-      if (!currentUser) setLoadingCache(false);
-    });
-    return () => unsubscribe();
+    setLoadingCache(false);
   }, []);
-
-  // 2. Hent lagrede resultater eller match-data når innlogget
-  useEffect(() => {
-    if (!user || !db) return;
-    
-    const fetchData = async () => {
-      try {
-        // Hent andres match-data hvis vi har en ID
-        if (matchId) {
-          const matchRef = doc(db, 'artifacts', appId, 'public', 'data', 'profiles', matchId);
-          const matchSnap = await getDoc(matchRef);
-          if (matchSnap.exists()) setMatchData(matchSnap.data().traits);
-        }
-
-        // Hent egne tidligere resultater
-        const docRef = doc(db, 'artifacts', appId, 'users', user.uid, 'results', 'latest');
-        const docSnap = await getDoc(docRef);
-        
-        if (docSnap.exists() && !matchId) { // Ikke auto-hopp til dashboard hvis vi har en matchId som krever fokus
-          const data = docSnap.data();
-          setResults(data.results);
-          setTestType(data.testType || 'extended');
-          setIncludeRiasec(data.includeRiasec || false);
-          setAppState('dashboard');
-        }
-      } catch (error) { console.error("Feil ved henting av data:", error); } 
-      finally { setLoadingCache(false); }
-    };
-    fetchData();
-  }, [user, db, matchId]);
 
   // Tastaturstøtte for testing
   useEffect(() => {
@@ -234,31 +197,30 @@ const App = () => {
     "Jeg foretrekker arbeid som krever nøyaktighet og strukturert organisering.", "Jeg liker å administrere budsjetter og holde system i dokumenter.", "Jeg trives best når jeg har tydelige instrukser og faste rutiner å følge.", "Jeg liker å jobbe med regneark (Excel) og arkiveringssystemer.", "Jeg er flink til å oppdage skrivefeil og detaljfeil i tekster eller tall."
   ];
 
-  const handlePdfExport = () => {
+  async function handlePdfExport() {
     setIsGeneratingPDF(true);
-    const script = document.createElement('script');
-    script.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js';
-    script.onload = () => {
-      const element = document.getElementById('pdf-content');
-      // Gjem elementer som ikke skal i PDF (knapper)
-      const ignoreElements = element.querySelectorAll('.html2pdf-ignore');
-      ignoreElements.forEach(el => el.style.display = 'none');
-      
-      const opt = {
-        margin:       0.3,
-        filename:     'Introspeksjon_Resultat.pdf',
-        image:        { type: 'jpeg', quality: 0.98 },
-        html2canvas:  { scale: 2, useCORS: true, windowWidth: 1000 },
-        jsPDF:        { unit: 'in', format: 'a4', orientation: 'portrait' }
-      };
-      
-      window.html2pdf().set(opt).from(element).save().then(() => {
-        ignoreElements.forEach(el => el.style.display = '');
-        setIsGeneratingPDF(false);
-      });
+    const element = document.getElementById('pdf-content');
+
+    const ignoreElements = element.querySelectorAll('.html2pdf-ignore');
+    ignoreElements.forEach(el => el.style.display = 'none');
+
+    const opt = {
+      margin: 0.3,
+      filename: 'Introspeksjon_Resultat.pdf',
+      image: { type: 'jpeg', quality: 0.98 },
+      html2canvas: { scale: 2, useCORS: true, windowWidth: 1000 },
+      jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' }
     };
-    document.body.appendChild(script);
-  };
+
+    try {
+      await html2pdf().set(opt).from(element).save();
+    } catch (error) {
+      console.error("Kunne ikke generere PDF:", error);
+    } finally {
+      ignoreElements.forEach(el => el.style.display = '');
+      setIsGeneratingPDF(false);
+    }
+  }
 
   const generateShareLink = async () => {
     if (!user || !db || !results) return;
@@ -354,7 +316,12 @@ const App = () => {
         const parsedData = JSON.parse(data.candidates[0].content.parts[0].text.replace(/```json/g, '').replace(/```/g, '').trim());
         
         setResults(parsedData); setAppState('dashboard'); success = true;
-        if (user && db) await setDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'results', 'latest'), { results: parsedData, testType, includeRiasec: withRiasec, timestamp: new Date().toISOString() });
+        // Lagre resultatet i nettleseren
+        localStorage.setItem('introspectionResults', JSON.stringify({
+          results: parsedData,
+          testType: testType,
+          includeRiasec: withRiasec
+        }));
       } catch (err) {
         attempt++; if (attempt >= 3) { setErrorMessage(err.message); setAppState('error'); } else { await new Promise(r => setTimeout(r, delay)); delay *= 1.5; }
       }
@@ -516,7 +483,12 @@ const App = () => {
     <div className="min-h-screen bg-slate-100 p-4 md:p-8">
       {/* ACTION BAR: Holdes utenfor PDF'en */}
       <div className="max-w-6xl mx-auto mb-6 flex flex-wrap justify-between items-center gap-4 bg-white p-4 rounded-2xl shadow-sm border border-gray-200">
-        <button onClick={() => { setAppState('welcome'); setMatchId(null); setMatchData(null); }} className="text-sm font-bold text-indigo-600 hover:bg-indigo-50 px-4 py-2 rounded-lg transition-colors flex items-center gap-2"><ArrowLeft className="w-4 h-4"/> Tilbake til start</button>
+        <button onClick={() => { 
+          setAppState('welcome'); 
+          setMatchId(null); 
+          setMatchData(null); 
+          localStorage.removeItem('introspectionResults'); 
+        }} className="text-sm font-bold text-indigo-600 hover:bg-indigo-50 px-4 py-2 rounded-lg transition-colors flex items-center gap-2"><ArrowLeft className="w-4 h-4"/> Tilbake til start</button>
         <div className="flex flex-wrap gap-2">
           <button onClick={generateShareLink} className="flex items-center gap-2 text-sm font-semibold text-gray-700 bg-gray-100 hover:bg-gray-200 px-4 py-2 rounded-xl transition-all">
             {copiedLink ? <Check className="w-4 h-4 text-emerald-500" /> : <LinkIcon className="w-4 h-4" />} {copiedLink ? 'Lenke kopiert!' : 'Del kompatibilitets-lenke'}
