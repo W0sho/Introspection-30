@@ -224,7 +224,27 @@ const App = () => {
       margin: 0.3,
       filename: 'Introspeksjon_Resultat.pdf',
       image: { type: 'jpeg', quality: 0.98 },
-      html2canvas: { scale: 2, useCORS: true, windowWidth: 1000 },
+      html2canvas: { 
+        scale: 2, 
+        useCORS: true, 
+        windowWidth: 1000,
+        onclone: (clonedDoc) => {
+          // Omgåelse av html2canvas oklch parsing-bug (krasjer på farger injectet av moderne Tailwind/CSS)
+          const styleTags = clonedDoc.querySelectorAll('style');
+          styleTags.forEach(tag => {
+            if (tag.innerHTML.includes('oklch')) {
+              tag.innerHTML = tag.innerHTML.replace(/oklch\([^)]+\)/gi, 'rgb(156, 163, 175)');
+            }
+          });
+          const elements = clonedDoc.querySelectorAll('[style*="oklch"]');
+          elements.forEach(el => {
+            const styleStr = el.getAttribute('style');
+            if (styleStr) {
+              el.setAttribute('style', styleStr.replace(/oklch\([^)]+\)/gi, 'rgb(156, 163, 175)'));
+            }
+          });
+        }
+      },
       jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' }
     };
 
