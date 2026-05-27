@@ -122,7 +122,17 @@ const App = () => {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const mId = params.get('match');
-    if (mId) setMatchId(mId);
+
+    // Decode base64-encoded partner traits from URL (set by generateShareLink)
+    if (mId) {
+      try {
+        const decoded = JSON.parse(decodeURIComponent(atob(mId)));
+        setMatchData(decoded);
+        setMatchId(mId);
+      } catch (e) {
+        console.error("Ugyldig match-parameter i URL:", e);
+      }
+    }
 
     const saved = localStorage.getItem('introspectionProgress');
     if (saved) setSavedProgress(JSON.parse(saved));
@@ -223,19 +233,40 @@ const App = () => {
         useCORS: true, 
         windowWidth: 1000,
         onclone: (clonedDoc) => {
-          const styleTags = clonedDoc.querySelectorAll('style');
-          styleTags.forEach(tag => {
-            if (tag.innerHTML.includes('oklch')) {
-              tag.innerHTML = tag.innerHTML.replace(/oklch\([^)]+\)/gi, 'rgb(156, 163, 175)');
-            }
+          // Proper oklch → rgb converter (Tailwind v3/v4 uses oklch everywhere)
+          function oklchToRgb(str) {
+            const m = str.match(/oklch\(\s*([\d.]+%?)\s+([\d.]+)\s+([\d.]+)/i);
+            if (!m) return 'rgb(107,114,128)';
+            let L = parseFloat(m[1]);
+            if (m[1].includes('%')) L /= 100;
+            const C = parseFloat(m[2]);
+            const H = parseFloat(m[3]) * Math.PI / 180;
+            const a_ = C * Math.cos(H), b_ = C * Math.sin(H);
+            const l_ = L + 0.3963377774*a_ + 0.2158037573*b_;
+            const mL = L - 0.1055613458*a_ - 0.0638541728*b_;
+            const s_ = L - 0.0894841775*a_ - 1.2914855480*b_;
+            const lc = l_**3, mc = mL**3, sc = s_**3;
+            const lin = x => x <= 0.0031308 ? 12.92*x : 1.055*Math.pow(Math.max(0,x), 1/2.4) - 0.055;
+            const r = Math.round(Math.max(0, Math.min(1, lin( 4.0767416621*lc - 3.3077115913*mc + 0.2309699292*sc))) * 255);
+            const g = Math.round(Math.max(0, Math.min(1, lin(-1.2684380046*lc + 2.6097574011*mc - 0.3413193965*sc))) * 255);
+            const b = Math.round(Math.max(0, Math.min(1, lin(-0.0041960863*lc - 0.7034186147*mc + 1.7076147010*sc))) * 255);
+            return `rgb(${r},${g},${b})`;
+          }
+          function replaceOklch(str) {
+            return str.replace(/oklch\([^)]+\)/gi, match => oklchToRgb(match));
+          }
+          // Replace in all <style> blocks
+          clonedDoc.querySelectorAll('style').forEach(el => {
+            el.textContent = replaceOklch(el.textContent);
           });
-          const elements = clonedDoc.querySelectorAll('[style*="oklch"]');
-          elements.forEach(el => {
-            const styleStr = el.getAttribute('style');
-            if (styleStr) {
-              el.setAttribute('style', styleStr.replace(/oklch\([^)]+\)/gi, 'rgb(156, 163, 175)'));
-            }
+          // Replace in all inline style attributes
+          clonedDoc.querySelectorAll('[style]').forEach(el => {
+            el.setAttribute('style', replaceOklch(el.getAttribute('style') || ''));
           });
+          // Inject a safety-net override for any remaining CSS variables
+          const safeStyle = clonedDoc.createElement('style');
+          safeStyle.textContent = `*, *::before, *::after { color-scheme: light !important; }`;
+          clonedDoc.head.appendChild(safeStyle);
         }
       },
       jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' }
@@ -251,13 +282,13 @@ const App = () => {
     }
   }
 
-  const generateShareLink = async () => {
-    if (!user || !db || !results) return;
+  const generateShareLink = () => {
+    if (!results) return;
     try {
-      const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'profiles', user.uid);
-      await setDoc(docRef, { traits: results.personality.traits });
-      
-      const url = `${window.location.origin}${window.location.pathname}?match=${user.uid}`;
+      // Encode only name+score to keep URL short; descriptions not needed for compat analysis
+      const minimal = results.personality.traits.map(t => ({ name: t.name, score: t.score }));
+      const encoded = btoa(encodeURIComponent(JSON.stringify(minimal)));
+      const url = `${window.location.origin}${window.location.pathname}?match=${encoded}`;
       navigator.clipboard.writeText(url);
       setCopiedLink(true);
       setTimeout(() => setCopiedLink(false), 3000);
