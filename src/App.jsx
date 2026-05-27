@@ -8,7 +8,6 @@ import {
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from 'firebase/auth';
 import { getFirestore, doc, setDoc, getDoc } from 'firebase/firestore';
-import html2pdf from 'html2pdf.js';
 
 // Initialiser Firebase
 let auth = null;
@@ -199,6 +198,23 @@ const App = () => {
 
   async function handlePdfExport() {
     setIsGeneratingPDF(true);
+
+    if (typeof window.html2pdf === 'undefined') {
+      try {
+        await new Promise((resolve, reject) => {
+          const script = document.createElement('script');
+          script.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js';
+          script.onload = resolve;
+          script.onerror = reject;
+          document.head.appendChild(script);
+        });
+      } catch (e) {
+        console.error("Kunne ikke laste inn PDF-biblioteket:", e);
+        setIsGeneratingPDF(false);
+        return;
+      }
+    }
+
     const element = document.getElementById('pdf-content');
 
     const ignoreElements = element.querySelectorAll('.html2pdf-ignore');
@@ -213,7 +229,7 @@ const App = () => {
     };
 
     try {
-      await html2pdf().set(opt).from(element).save();
+      await window.html2pdf().set(opt).from(element).save();
     } catch (error) {
       console.error("Kunne ikke generere PDF:", error);
     } finally {
@@ -536,7 +552,7 @@ const App = () => {
           </div>
         </div>
 
-        {includeRiasec && results.aiCareerAnalysis && (
+        {includeRiasec && results.aiCareerAnalysis && results.riasec && (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 page-break-inside-avoid mt-6">
             <div className="bg-white rounded-3xl shadow-sm border border-gray-200 p-8 flex flex-col">
               <div className="flex items-center gap-3 mb-5"><Lightbulb className="w-7 h-7 text-amber-500" /><h2 className="text-xl font-bold text-gray-900">RIASEC</h2></div>
