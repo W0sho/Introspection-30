@@ -99,7 +99,7 @@ const App = () => {
   const [results, setResults] = useState(null);
   const [errorMessage, setErrorMessage] = useState("");
   const [loadingAttempt, setLoadingAttempt] = useState(1);
-  const [copied, setCopied] = useState(false);
+  const [copiedLink, setCopiedLink] = useState(false);
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
 
   const [currentQuestionIdx, setCurrentQuestionIdx] = useState(1);
@@ -114,23 +114,19 @@ const App = () => {
 
   // Kompatibilitet Dele-lenke funksjonalitet
   const [matchId, setMatchId] = useState(null);
-  const [matchData, setMatchData] = useState(null); // Den andres data
+  const [matchData, setMatchData] = useState(null); 
   const [isCompatModalOpen, setIsCompatModalOpen] = useState(false);
   const [compatAnalysis, setCompatAnalysis] = useState(null);
   const [isAnalyzingCompat, setIsAnalyzingCompat] = useState(false);
-  const [copiedLink, setCopiedLink] = useState(false);
 
-// 1. Initialisering (URL Params, Lokal Cache)
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const mId = params.get('match');
     if (mId) setMatchId(mId);
 
-    // Hent påbegynt test
     const saved = localStorage.getItem('introspectionProgress');
     if (saved) setSavedProgress(JSON.parse(saved));
 
-    // Hent ferdig testresultat
     const savedResults = localStorage.getItem('introspectionResults');
     if (savedResults && !mId) {
       const data = JSON.parse(savedResults);
@@ -143,7 +139,6 @@ const App = () => {
     setLoadingCache(false);
   }, []);
 
-  // Tastaturstøtte for testing
   useEffect(() => {
     const handleKeyDown = (e) => {
       if (appState !== 'testing' || isTransitioning) return;
@@ -154,7 +149,6 @@ const App = () => {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [appState, isTransitioning, answers, currentQuestionIdx]);
 
-  // Automatisk trigger kompatibilitetsanalyse hvis matchData er lastet og test er ferdig
   useEffect(() => {
     if (appState === 'dashboard' && matchData && results && !compatAnalysis && !isAnalyzingCompat) {
       setIsCompatModalOpen(true);
@@ -229,7 +223,6 @@ const App = () => {
         useCORS: true, 
         windowWidth: 1000,
         onclone: (clonedDoc) => {
-          // Omgåelse av html2canvas oklch parsing-bug (krasjer på farger injectet av moderne Tailwind/CSS)
           const styleTags = clonedDoc.querySelectorAll('style');
           styleTags.forEach(tag => {
             if (tag.innerHTML.includes('oklch')) {
@@ -261,7 +254,6 @@ const App = () => {
   const generateShareLink = async () => {
     if (!user || !db || !results) return;
     try {
-      // Lagrer personlighetstrekkene i en offentlig sti for deling
       const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'profiles', user.uid);
       await setDoc(docRef, { traits: results.personality.traits });
       
@@ -274,29 +266,14 @@ const App = () => {
 
   const generateInsights = async (finalAnswers, withRiasec) => {
     setAppState('analyzing'); setErrorMessage(""); setLoadingAttempt(1);
-    
-    // Fjern pågående lagring når testen er ferdig
     localStorage.removeItem('introspectionProgress');
 
-    const norms = { O: { mean: 3.6, sd: 0.6 }, C: { mean: 3.4, sd: 0.6 }, E: { mean: 3.3, sd: 0.7 }, A: { mean: 3.7, sd: 0.5 }, N: { mean: 2.9, sd: 0.7 } };
-    const b5Keys = ['O', 'C', 'E', 'A', 'N'];
-    const b5Scores = { O: 0, C: 0, E: 0, A: 0, N: 0 };
-    const b5Counts = { O: 0, C: 0, E: 0, A: 0, N: 0 };
+    // 1. RIASEC
     const rKeys = ['R', 'I', 'A', 'S', 'E', 'C'];
     const rScores = { R: 0, I: 0, A: 0, S: 0, E: 0, C: 0 };
-
     finalAnswers.forEach((ans, idx) => {
-      if (idx < 120) { b5Scores[b5Keys[idx % 5]] += ans; b5Counts[b5Keys[idx % 5]] += 1; } 
-      else { rScores[rKeys[Math.floor((idx - 120) / 5)]] += ans; }
+      if (idx >= 120) rScores[rKeys[Math.floor((idx - 120) / 5)]] += ans;
     });
-
-    const getPercentile = (trait) => {
-      if (b5Counts[trait] === 0) return 50;
-      const z = ((b5Scores[trait] / b5Counts[trait]) - norms[trait].mean) / norms[trait].sd;
-      const k = 1.0 / (1.0 + 0.2316419 * Math.abs(z));
-      const p = 1.0 - 1.0 / Math.sqrt(2 * Math.PI) * Math.exp(-0.5 * z * z) * (0.31938153 * k + -0.356563782 * k * k + 1.781477937 * Math.pow(k, 3) + -1.821255978 * Math.pow(k, 4) + 1.330274429 * Math.pow(k, 5));
-      return Math.max(1, Math.min(99, Math.round((z < 0 ? 1.0 - p : p) * 100)));
-    };
 
     let riasecString = "Ikke valgt";
     if (withRiasec) {
@@ -304,13 +281,65 @@ const App = () => {
       riasecString = sortedRiasec.slice(0, 3).map(arr => arr[0]).join('');
     }
 
-    const prompt = `Du er en ekspert innen psykometri. Brukeren har følgende PERSENTIL-score (1-99):
-      Åpenhet: ${getPercentile('O')}. Planmessighet: ${getPercentile('C')}. Ekstroversjon: ${getPercentile('E')}. Medmenneskelighet: ${getPercentile('A')}. Nevrotisisme: ${getPercentile('N')}. ${withRiasec ? `RIASEC: ${riasecString}` : ''}
-      Analyser og returner profil. For HVERT hovedtrekk:
-      1. Score må stemme EKSAKT.
-      2. Del inn i 2 aspekter med estimert persentil: (Åpenhet: Intellekt/Kreativitet. Planmessighet: Orden/Gjennomføringsevne. Ekstroversjon: Entusiasme/Selvmarkering. Medmenneskelighet: Empati/Høflighet. Nevrotisisme: Temperament/Sårbarhet).
-      3. Inkluder 6 fasetter per trekk med estimert persentil.
-      4. For 'romance', fyll 'ideal' og 'avoid' basert på kompatibilitet.`;
+    // 2. MATEMATISK BEREGNING AV DE 30 FASETTENE (Big Five)
+    const domainsInfo = [
+      { name: 'Åpenhet', aspects: [{ name: 'Intellekt', f: [0, 4] }, { name: 'Åpenhet for opplevelser', f: [1, 2, 3, 5] }], facets: ['Fantasi', 'Estetikk', 'Følelser', 'Variasjonssøken', 'Intellekt', 'Frisinnethet'] },
+      { name: 'Planmessighet', aspects: [{ name: 'Gjennomføringsevne', f: [0, 3, 4] }, { name: 'Orden', f: [1, 2, 5] }], facets: ['Kompetanse', 'Orden', 'Pliktoppfyllende', 'Målrettethet', 'Selvdisiplin', 'Betenksomhet'] },
+      { name: 'Ekstroversjon', aspects: [{ name: 'Entusiasme', f: [0, 1, 5] }, { name: 'Selvmarkering', f: [2, 3, 4] }], facets: ['Varme', 'Sosiabilitet', 'Selvmarkering', 'Aktivitetsnivå', 'Spenningssøken', 'Entusiasme'] },
+      { name: 'Medmenneskelighet', aspects: [{ name: 'Empati', f: [0, 2, 5] }, { name: 'Høflighet', f: [1, 3, 4] }], facets: ['Tillit', 'Ærlighet', 'Altruisme', 'Føyelighet', 'Beskjedenhet', 'Medsyn'] },
+      { name: 'Nevrotisisme', aspects: [{ name: 'Temperament', f: [1, 4] }, { name: 'Sårbarhet', f: [0, 2, 3, 5] }], facets: ['Angst', 'Temperament', 'Nedstemthet', 'Selvbevissthet', 'Impulsivitet', 'Sårbarhet'] }
+    ];
+
+    const rawFacets = [[0,0,0,0,0,0], [0,0,0,0,0,0], [0,0,0,0,0,0], [0,0,0,0,0,0], [0,0,0,0,0,0]];
+    const reversedIndices = [18, 50, 52, 53, 58, 69, 78, 83, 103, 108]; // Enkel reverseringsnøkkel for økt nøyaktighet
+
+    finalAnswers.forEach((ans, idx) => {
+      if (idx < 120) {
+        const d = idx % 5;
+        const f = Math.floor(idx / 5) % 6;
+        let val = ans;
+        if (reversedIndices.includes(idx)) val = 6 - ans; // Reverser skalaen
+        rawFacets[d][f] += val;
+      }
+    });
+
+    const calcPercentile = (score, max) => {
+      const mean = max * 0.6;
+      const sd = max * 0.18;
+      let z = (score - mean) / sd;
+      const k = 1.0 / (1.0 + 0.2316419 * Math.abs(z));
+      const p = 1.0 - 1.0 / Math.sqrt(2 * Math.PI) * Math.exp(-0.5 * z * z) * (0.31938153 * k + -0.356563782 * k * k + 1.781477937 * Math.pow(k, 3) + -1.821255978 * Math.pow(k, 4) + 1.330274429 * Math.pow(k, 5));
+      return Math.max(1, Math.min(99, Math.round((z < 0 ? 1.0 - p : p) * 100)));
+    };
+
+    let profileDataString = "";
+    domainsInfo.forEach((dom, dIdx) => {
+      let dScoreRaw = 0;
+      const aspectScores = dom.aspects.map(a => ({ name: a.name, raw: 0, max: a.f.length * 20 }));
+      const facetScores = dom.facets.map((fName, fIdx) => {
+         const raw = rawFacets[dIdx][fIdx];
+         dScoreRaw += raw;
+         dom.aspects.forEach((a, aIdx) => { if (a.f.includes(fIdx)) aspectScores[aIdx].raw += raw; });
+         return { name: fName, pct: calcPercentile(raw, 20) };
+      });
+
+      profileDataString += `\nTrekk: ${dom.name} (Score: ${calcPercentile(dScoreRaw, 120)})\n`;
+      aspectScores.forEach(a => { profileDataString += `  Aspekt: ${a.name} (Score: ${calcPercentile(a.raw, a.max)})\n`; });
+      facetScores.forEach(f => { profileDataString += `    Fasett: ${f.name} (Score: ${f.pct})\n`; });
+    });
+
+    const prompt = `Du er en ekspert innen psykometri.
+    Jeg har kalkulert brukerens FAKTISKE, nøyaktige persentiler (1-99) basert på en 120-spørsmåls psykometrisk test:
+    ${profileDataString}
+    ${withRiasec ? `\nRIASEC Topp-profil: ${riasecString}` : ''}
+
+    OPPGAVE:
+    Lag en utfyllende personlighetsprofil basert på disse eksakte dataene.
+    VIKTIG REGLER: 
+    1. Du SKAL bruke nøyaktig de samme navnene og scorene som er listet opp i dataene over for alle trekk, aspekter og fasetter. 
+    2. IKKE finn på egne score eller navn.
+    3. For hvert trekk, aspekt og fasett: Generer en treffende, profesjonell tekst ('desc') som forklarer resultatet.
+    4. Svar kun i JSON-formatet jeg har definert.`;
 
     const payload = {
       contents: [{ parts: [{ text: prompt }] }],
@@ -352,11 +381,8 @@ const App = () => {
         const parsedData = JSON.parse(data.candidates[0].content.parts[0].text.replace(/```json/g, '').replace(/```/g, '').trim());
         
         setResults(parsedData); setAppState('dashboard'); success = true;
-        // Lagre resultatet i nettleseren
         localStorage.setItem('introspectionResults', JSON.stringify({
-          results: parsedData,
-          testType: testType,
-          includeRiasec: withRiasec
+          results: parsedData, testType: testType, includeRiasec: withRiasec
         }));
       } catch (err) {
         attempt++; if (attempt >= 3) { setErrorMessage(err.message); setAppState('error'); } else { await new Promise(r => setTimeout(r, delay)); delay *= 1.5; }
@@ -390,7 +416,6 @@ const App = () => {
     const newAnswers = [...answers, value];
     setAnswers(newAnswers);
     
-    // Lagre progress lokalt for hver handling
     localStorage.setItem('introspectionProgress', JSON.stringify({
       type: testType, answers: newAnswers, currentQuestionIdx: currentQuestionIdx + 1, maxQuestions, includeRiasec
     }));
