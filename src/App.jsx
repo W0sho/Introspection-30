@@ -224,6 +224,24 @@ const App = () => {
     const ignoreElements = element.querySelectorAll('.html2pdf-ignore');
     ignoreElements.forEach(el => el.style.display = 'none');
 
+    // --- START: CSS STRIPPING (Legges rett før 'const opt = ...') ---
+    const style = document.createElement('style');
+    style.innerHTML = `
+      /* Tvinger fjerning av oklch og setter trygge RGB/HEX-fallbacks */
+      * { 
+        color: inherit !important; 
+        background-color: inherit !important; 
+      }
+      .bg-indigo-500 { background-color: #6366f1 !important; }
+      .bg-indigo-400 { background-color: #818cf8 !important; }
+      .bg-indigo-50 { background-color: #e0e7ff !important; }
+      .text-indigo-600 { color: #4f46e5 !important; }
+      .text-indigo-700 { color: #4338ca !important; }
+      .bg-slate-100 { background-color: #f1f5f9 !important; }
+    `;
+    document.head.appendChild(style);
+    // --- SLUTT: CSS STRIPPING ---
+
     const opt = {
       margin: 0.3,
       filename: 'Introspeksjon_Resultat.pdf',
@@ -273,13 +291,20 @@ const App = () => {
     };
 
     try {
-      await window.html2pdf().set(opt).from(element).save();
+      await html2pdf().set(opt).from(element).save();
     } catch (error) {
       console.error("Kunne ikke generere PDF:", error);
     } finally {
+      // Din eksisterende kode for å vise .html2pdf-ignore igjen...
       ignoreElements.forEach(el => el.style.display = '');
+      
+      // --- START: RYDD OPP CSS STRIPPING ---
+      if (document.head.contains(style)) {
+        document.head.removeChild(style);
+      }
+      // --- SLUTT: RYDD OPP CSS STRIPPING ---
+      
       setIsGeneratingPDF(false);
-    }
   }
 
   const generateShareLink = () => {
