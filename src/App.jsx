@@ -607,7 +607,7 @@ useEffect(() => {
     const myTraits = results.personality.traits.map(t => `${t.name}: ${t.score}. persentil`).join(', ');
     const partnerString = typeof partnerTraits === 'string' ? partnerTraits : partnerTraits.map(t => `${t.name}: ${t.score}. persentil`).join(', ');
     
-    const prompt = `Du er ekspert på parterapi. Person 1 (Meg): ${myTraits}. Person 2 (Partner): "${partnerString}".
+    const prompt = `Du er ekspert på psykometri og parterapi. Person 1 (Meg): ${myTraits}. Person 2 (Partner): "${partnerString}".
     Analyser kompatibilitet. Returner KUN JSON strukturert nøyaktig slik (ingen markdown, ingen tekst utenfor):
     {"score": <tall 1-100>, "summary": "<Oppsummering>", "strengths": ["<styrke 1>"], "challenges": ["<utfordring 1>"]}`;
 
