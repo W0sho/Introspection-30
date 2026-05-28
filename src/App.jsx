@@ -203,108 +203,64 @@ const App = () => {
   async function handlePdfExport() {
     setIsGeneratingPDF(true);
 
-    if (typeof window.html2pdf === 'undefined') {
-      try {
+    try {
+      // 1. last inn jsPDF først
+      if (typeof window.jspdf === 'undefined') {
         await new Promise((resolve, reject) => {
           const script = document.createElement('script');
-          script.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js';
+          script.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
+          script.onload = () => {
+            window.jsPDF = window.jspdf.jsPDF; // html2pdf forventer dette navn
+            resolve();
+          };
+          script.onerror = reject;
+          document.head.appendChild(script);
+        });
+      }
+
+      // 2. last inn html2canvas-pro (Denne LØSER oklch-problemet!)
+      if (typeof window.html2canvas === 'undefined') {
+        await new Promise((resolve, reject) => {
+          const script = document.createElement('script');
+          script.src = 'https://cdn.jsdelivr.net/npm/html2canvas-pro@1.0.27/dist/html2canvas.min.js';
           script.onload = resolve;
           script.onerror = reject;
           document.head.appendChild(script);
         });
-      } catch (e) {
-        console.error("Kunne ikke laste inn PDF-biblioteket:", e);
-        setIsGeneratingPDF(false);
-        return;
       }
-    }
 
-    const element = document.getElementById('pdf-content');
-
-    const ignoreElements = element.querySelectorAll('.html2pdf-ignore');
-    ignoreElements.forEach(el => el.style.display = 'none');
-
-    // --- START: CSS STRIPPING (Legges rett før 'const opt = ...') ---
-    const style = document.createElement('style');
-    style.innerHTML = `
-      /* Tvinger fjerning av oklch og setter trygge RGB/HEX-fallbacks */
-      * { 
-        color: inherit !important; 
-        background-color: inherit !important; 
+      // 3. last inn den UBUNDTEDE html2pdf (som nå tvinges til å bruke pro-versionen ovenfor)
+      if (typeof window.html2pdf === 'undefined') {
+        await new Promise((resolve, reject) => {
+          const script = document.createElement('script');
+          script.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.min.js';
+          script.onload = resolve;
+          script.onerror = reject;
+          document.head.appendChild(script);
+        });
       }
-      .bg-indigo-500 { background-color: #6366f1 !important; }
-      .bg-indigo-400 { background-color: #818cf8 !important; }
-      .bg-indigo-50 { background-color: #e0e7ff !important; }
-      .text-indigo-600 { color: #4f46e5 !important; }
-      .text-indigo-700 { color: #4338ca !important; }
-      .bg-slate-100 { background-color: #f1f5f9 !important; }
-    `;
-    document.head.appendChild(style);
-    // --- SLUTT: CSS STRIPPING ---
 
-    const opt = {
-      margin: 0.3,
-      filename: 'Introspeksjon_Resultat.pdf',
-      image: { type: 'jpeg', quality: 0.98 },
-      html2canvas: { 
-        scale: 2, 
-        useCORS: true, 
-        windowWidth: 1000,
-        onclone: (clonedDoc) => {
-          // Proper oklch → rgb converter (Tailwind v3/v4 uses oklch everywhere)
-          function oklchToRgb(str) {
-            const m = str.match(/oklch\(\s*([\d.]+%?)\s+([\d.]+)\s+([\d.]+)/i);
-            if (!m) return 'rgb(107,114,128)';
-            let L = parseFloat(m[1]);
-            if (m[1].includes('%')) L /= 100;
-            const C = parseFloat(m[2]);
-            const H = parseFloat(m[3]) * Math.PI / 180;
-            const a_ = C * Math.cos(H), b_ = C * Math.sin(H);
-            const l_ = L + 0.3963377774*a_ + 0.2158037573*b_;
-            const mL = L - 0.1055613458*a_ - 0.0638541728*b_;
-            const s_ = L - 0.0894841775*a_ - 1.2914855480*b_;
-            const lc = l_**3, mc = mL**3, sc = s_**3;
-            const lin = x => x <= 0.0031308 ? 12.92*x : 1.055*Math.pow(Math.max(0,x), 1/2.4) - 0.055;
-            const r = Math.round(Math.max(0, Math.min(1, lin( 4.0767416621*lc - 3.3077115913*mc + 0.2309699292*sc))) * 255);
-            const g = Math.round(Math.max(0, Math.min(1, lin(-1.2684380046*lc + 2.6097574011*mc - 0.3413193965*sc))) * 255);
-            const b = Math.round(Math.max(0, Math.min(1, lin(-0.0041960863*lc - 0.7034186147*mc + 1.7076147010*sc))) * 255);
-            return `rgb(${r},${g},${b})`;
-          }
-          function replaceOklch(str) {
-            return str.replace(/oklch\([^)]+\)/gi, match => oklchToRgb(match));
-          }
-          // Replace in all <style> blocks
-          clonedDoc.querySelectorAll('style').forEach(el => {
-            el.textContent = replaceOklch(el.textContent);
-          });
-          // Replace in all inline style attributes
-          clonedDoc.querySelectorAll('[style]').forEach(el => {
-            el.setAttribute('style', replaceOklch(el.getAttribute('style') || ''));
-          });
-          // Inject a safety-net override for any remaining CSS variables
-          const safeStyle = clonedDoc.createElement('style');
-          safeStyle.textContent = `*, *::before, *::after { color-scheme: light !important; }`;
-          clonedDoc.head.appendChild(safeStyle);
-        }
-      },
-      jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' }
-    };
+      const element = document.getElementById('pdf-content');
+      const ignoreElements = element.querySelectorAll('.html2pdf-ignore');
+      ignoreElements.forEach(el => el.style.display = 'none');
 
-    try {
-      await html2pdf().set(opt).from(element).save();
+      const opt = {
+        margin: 0.3,
+        filename: 'Introspeksjon_Resultat.pdf',
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: { scale: 2, useCORS: true, logging: false },
+        jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' }
+      };
+
+      await window.html2pdf().set(opt).from(element).save();
+
+      // Ryd op og vis knapperne igen
+      ignoreElements.forEach(el => el.style.display = '');
     } catch (error) {
       console.error("Kunne ikke generere PDF:", error);
     } finally {
-      // Din eksisterende kode for å vise .html2pdf-ignore igjen...
-      ignoreElements.forEach(el => el.style.display = '');
-      
-      // --- START: RYDD OPP CSS STRIPPING ---
-      if (document.head.contains(style)) {
-        document.head.removeChild(style);
-      }
-      // --- SLUTT: RYDD OPP CSS STRIPPING ---
-      
       setIsGeneratingPDF(false);
+    }
   }
 
   const generateShareLink = () => {
