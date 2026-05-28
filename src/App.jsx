@@ -117,6 +117,39 @@ const App = () => {
   const [compatAnalysis, setCompatAnalysis] = useState(null);
   const [isAnalyzingCompat, setIsAnalyzingCompat] = useState(false);
 
+  // 1. Logg inn brukeren anonymt i bakgrunnen (Kreves for å kunne dele lenke)
+  useEffect(() => {
+    if (auth) {
+      const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+        if (currentUser) {
+          setUser(currentUser);
+        } else {
+          signInAnonymously(auth).catch(console.error);
+        }
+      });
+      return () => unsubscribe();
+    }
+  }, []);
+
+  // 2. Hent vennens resultat fra Firebase hvis URL-en har en match-ID
+  useEffect(() => {
+    const fetchMatchData = async () => {
+      if (db && matchId) {
+        try {
+          const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'profiles', matchId);
+          const docSnap = await getDoc(docRef);
+          if (docSnap.exists()) {
+            setMatchData(docSnap.data().traits);
+          }
+        } catch (e) {
+          console.error("Kunne ikke hente match-data:", e);
+        }
+      }
+    };
+    fetchMatchData();
+  }, [matchId]);
+
+  // 1. initialisering (URL params, lokal Cache)
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const mId = params.get('match');
