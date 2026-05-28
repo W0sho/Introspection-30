@@ -156,30 +156,39 @@ const App = () => {
 
 
   const questionBank = [
-    "Jeg har en livlig fantasi og drømmer meg ofte bort.", "Jeg planlegger ting i god tid og unngår å utsette oppgaver.", "Jeg får energi av å være rundt mange mennesker.", "Jeg stoler på at andre mennesker har gode intensjoner.", "Jeg blir ofte bekymret for ting som kan gå galt.",
-    "Jeg forstår abstrakte ideer og teorier lett.", "Jeg holder alltid orden på sakene mine og har det ryddig.", "Jeg starter ofte samtaler med folk jeg ikke kjenner.", "Jeg er rett frem og ærlig i mine hensikter med andre.", "Jeg blir lett stresset og anspent i krevende situasjoner.",
-    "Jeg setter stor pris på kunst, design og estetikk.", "Jeg fullfører alltid det jeg begynner på, selv om det er kjedelig.", "Jeg er ofte festens midtpunkt og trives med oppmerksomhet.", "Jeg stiller ofte opp for å hjelpe andre som trenger det.", "Jeg opplever ofte humørsvingninger uten tydelig grunn.",
-    "Jeg foretrekker variasjon og nye opplevelser fremfor strenge rutiner.", "Jeg er nøyaktig, grundig og detaljorientert i arbeidet mitt.", "Jeg tar ofte styringen og leder an i sosiale situasjoner.", "Jeg unngår konflikter og diskusjoner så mye som mulig.", "Jeg kan bli lett irritert eller frustrert over småting.",
-    "Jeg opplever dype og komplekse følelser i hverdagen.", "Jeg følger regler og forpliktelser nøye.", "Jeg har et høyt aktivitetsnivå og er alltid på farten.", "Jeg er beskjeden og liker ikke å skryte av meg selv.", "Jeg føler meg ofte usikker på meg selv i nye situasjoner.",
-    "Jeg liker å diskutere filosofiske og intellektuelle problemstillinger.", "Jeg jobber systematisk for å nå mine langsiktige mål.", "Jeg liker spenning og oppsøker ofte fartsfylte opplevelser.", "Jeg har stor medfølelse for andres problemer.", "Jeg har vanskelig for å takle kritikk fra andre.",
-    "Jeg har et bredt spekter av interesser.", "Jeg unngår å gjøre feil ved å dobbeltsjekke arbeidet mitt.", "Jeg er full av entusiasme og viser mye glede.", "Jeg får andre til å føle seg velkomne og komfortable.", "Jeg føler meg ofte overveldet av alt jeg må gjøre.",
-    "Jeg er åpen for verdier og levemåter som er annerledes enn mine egne.", "Jeg krever mye av meg selv og setter høye standarder.", "Jeg foretrekker å jobbe i team fremfor å jobbe alene.", "Jeg tilgir lett folk som har gjort feil mot meg.", "Jeg kan av og til føle meg trist eller nedfor.",
-    "Jeg liker å prøve ut nye hobbyer og aktiviteter.", "Jeg tenker meg alltid nøye om før jeg handler.", "Jeg snakker mye og uttrykker meg tydelig.", "Jeg setter andres behov foran mine egne.", "Jeg har lett for å få panikk i nødssituasjoner.",
-    "Jeg ser ofte etter dypere mening i ting rundt meg.", "Jeg er kjent for å være svært pålitelig og ansvarsfull.", "Jeg er god til å overtale og motivere andre.", "Jeg samarbeider heller enn å konkurrere med andre.", "Jeg sliter med å legge fra meg negative tanker.",
-    "Jeg unngår å snakke om mine egne prestasjoner.", "Jeg føler meg komfortabel med å utfordre tradisjoner.", "Jeg trives dårlig med uforutsigbare endringer.", "Jeg foretrekker å holde meg i bakgrunnen i store grupper.", "Jeg tror de fleste vil utnytte meg hvis de får sjansen.",
-    "Jeg føler ofte at jeg ikke er god nok.", "Jeg liker å løse komplekse gåter og tankenøtter.", "Jeg møter alltid opp presis til avtaler.", "Jeg ler ofte høyt og smiler mye i hverdagen.", "Jeg gir ofte penger eller tid til veldedige formål.",
-    "Jeg har lett for å la meg oppsluke av musikk.", "Jeg er stolt av å være en strukturert person.", "Jeg trives best når det skjer mye rundt meg hele tiden.", "Jeg prøver alltid å se saken fra den andres side.", "Jeg blir fort urolig hvis jeg ikke har kontroll på situasjonen.",
-    "Jeg elsker å lære nye ting, selv om jeg ikke har bruk for det.", "Jeg lager ofte lister for å holde oversikt over hva som må gjøres.", "Jeg har lett for å knytte nye kontakter.", "Jeg skjuler sjelden mine egentlige intensjoner.", "Jeg frykter ofte at det verste vil skje.",
-    "Jeg liker å lese skjønnlitteratur eller poesi.", "Jeg jobber hardere enn de fleste for å oppnå det jeg vil.", "Jeg blir rastløs hvis jeg må sitte stille over lengre tid.", "Jeg unngår bevisst å fornærme andre.", "Jeg kan føle meg skamfull over små tabber i lang tid.",
-    "Jeg liker å reise til steder jeg aldri har vært før.", "Jeg rydder alltid opp etter meg med én gang.", "Jeg tar raskt ordet når en gruppe skal diskutere noe.", "Jeg tror grunnleggende at mennesker er gode på bunnen.", "Jeg har dager hvor jeg føler meg helt energiløs uten grunn.",
-    "Jeg er fascinert av hvordan samfunnet og mennesker fungerer.", "Jeg er flink til å motstå fristelser.", "Jeg liker å ha bakgrunnsstøy når jeg jobber.", "Jeg er rask til å be om unnskyldning hvis jeg har tatt feil.", "Jeg blir veldig nervøs når jeg må snakke foran forsamlinger.",
-    "Jeg utfordrer ofte mine egne holdninger og synspunkter.", "Jeg gir aldri opp før problemet er løst.", "Jeg oppsøker aktiviteter som gir meg et adrenalin-kick.", "Jeg føler sterk empati med de som har det vanskelig.", "Jeg blir fort sint hvis ting ikke går min vei.",
-    "Jeg trives best i omgivelser som er estetisk vakre.", "Jeg handler sjelden på impuls.", "Jeg viser lett hengivenhet overfor venner og familie.", "Jeg mener at ærlighet er viktigere enn å være høflig.", "Jeg har ofte vanskelig for å sove på grunn av bekymringer.",
-    "Jeg liker å utforske ulike typer mat og fremmede kulturer.", "Jeg forbereder meg alltid grundig til viktige møter.", "Jeg snakker høyere enn de fleste i rommet.", "Jeg gir alltid andre gleden av tvilen.", "Jeg føler meg ofte ensom, selv med andre rundt meg.",
-    "Jeg foretrekker dokumentarer fremfor lett underholdning.", "Jeg er den første til å ta ansvar når noe går galt.", "Jeg kjeder meg raskt hvis jeg må være alene en hel helg.", "Jeg hater å presse andre til å gjøre noe de ikke vil.", "Jeg mister ofte besinnelsen.",
-    "Jeg ser skjønnhet i ting som andre kanskje synes er rart.", "Jeg holder meg alltid strengt til dietter eller treningsplaner.", "Jeg elsker å underholde andre mennesker.", "Jeg ser på meg selv som en veldig tilgivende person.", "Jeg føler meg ofte hjelpeløs når jeg møter motgang.",
-    "Jeg tenker ofte på meningen med livet.", "Jeg har alltid skrivebordet og datamaskinen min godt organisert.", "Jeg trives i rampelyset.", "Jeg kan lett tilpasse meg for å gjøre andre til lags.", "Jeg blir ofte stresset når jeg har for mye på timeplanen.",
-    "Jeg føler et stort behov for å uttrykke meg kreativt.", "Jeg har klare mål for hvor jeg vil være om fem år.", "Jeg elsker å delta på store arrangementer eller festivaler.", "Jeg liker ikke å stikke meg frem på bekostning av andre.", "Jeg føler ofte et ubehag i brystet når jeg er stresset.",
+    // RUNDE 1 (Spørsmål 1-30)
+    "Jeg har en livlig fantasi.", "Jeg fullfører oppgaver med suksess.", "Jeg får lett venner.", "Jeg stoler på at andre har gode intensjoner.", "Jeg bekymrer meg ofte for ting.",
+    "Jeg verdsetter kunst og skjønnhet.", "Jeg liker å ha det ryddig rundt meg.", "Jeg elsker store fester.", "Jeg bruker ikke smiger for å få viljen min.", "Jeg blir lett irritert.",
+    "Jeg opplever dype følelser.", "Jeg holder alltid det jeg lover.", "Jeg tar ofte styringen i grupper.", "Jeg elsker å hjelpe andre.", "Jeg føler meg ofte trist.",
+    "Jeg foretrekker variasjon i hverdagen.", "Jeg jobber hardt for å nå målene mine.", "Jeg er alltid på farten.", "Jeg unngår å havne i konflikter.", "Jeg blir lett flau.",
+    "Jeg liker å løse komplekse problemer.", "Jeg får jobben gjort med en gang.", "Jeg elsker spenning og eventyr.", "Jeg liker ikke å skryte av meg selv.", "Jeg gjør ofte ting uten å tenke meg om.",
+    "Jeg utfordrer ofte tradisjoner.", "Jeg tenker meg nøye om før jeg handler.", "Jeg viser mye glede og entusiasme.", "Jeg føler dyp sympati for de som har det vanskelig.", "Jeg får lett panikk i stressende situasjoner.",
+    
+    // RUNDE 2 (Spørsmål 31-60)
+    "Jeg drømmer meg ofte bort.", "Jeg tviler ofte på mine egne evner.", "Jeg er en varm og vennlig person.", "Jeg mistenker ofte andres motiver.", "Jeg er sjelden bekymret.",
+    "Jeg bryr meg lite om kunstutstillinger.", "Jeg roter mye.", "Jeg unngår store folkemengder.", "Jeg kan vri på sannheten for å unngå problemer.", "Jeg mister sjelden besinnelsen.",
+    "Jeg legger sjelden merke til mine egne emosjoner.", "Jeg bryter ofte regler.", "Jeg holder meg i bakgrunnen i sosiale sammenhenger.", "Jeg har ikke tid til å hjelpe andre.", "Jeg føler meg sjelden deprimert.",
+    "Jeg hater forandringer.", "Jeg setter meg sjelden høye mål.", "Jeg foretrekker et rolig tempo.", "Jeg er ikke redd for å krangle med andre.", "Jeg bryr meg lite om hva andre tenker om meg.",
+    "Jeg har problemer med å forstå abstrakte ideer.", "Jeg utsetter ofte ting som må gjøres.", "Jeg unngår fartsfylte og farlige aktiviteter.", "Jeg anser meg selv som bedre enn de fleste.", "Jeg klarer lett å motstå fristelser.",
+    "Jeg mener vi bør holde oss til etablerte tradisjoner.", "Jeg tar ofte forhastede beslutninger.", "Jeg sprudler sjelden over av glede.", "Jeg bryr meg ikke spesielt mye om andres problemer.", "Jeg beholder alltid roen i kriser.",
+
+    // RUNDE 3 (Spørsmål 61-90)
+    "Jeg liker å la tankene vandre.", "Jeg håndterer de fleste oppgaver bra.", "Jeg får andre til å føle seg velkomne.", "Jeg tror grunnleggende at mennesker er gode.", "Jeg blir fort stresset før viktige hendelser.",
+    "Jeg blir dypt rørt av musikk eller poesi.", "Jeg holder alltid skrivebordet mitt rent.", "Jeg prater gjerne med fremmede.", "Jeg prøver alltid å være hundre prosent ærlig.", "Jeg blir fort sint når ting ikke går min vei.",
+    "Mine følelser styrer ofte mine handlinger.", "Jeg gjør alltid min plikt, selv når det er vanskelig.", "Jeg vet hvordan jeg skal overbevise andre.", "Jeg er alltid villig til å låne bort tingene mine.", "Jeg føler noen ganger at jeg ikke er verdt noe.",
+    "Jeg elsker å prøve nye hobbyer og aktiviteter.", "Jeg har klare planer for fremtiden min.", "Jeg har et høyt energinivå.", "Jeg gir meg ofte i diskusjoner for å bevare husfreden.", "Jeg er redd for å dumme meg ut foran andre.",
+    "Jeg elsker intellektuelle diskusjoner.", "Jeg gjennomfører alltid planene mine.", "Jeg søker gjerne etter et skikkelig adrenalin-kick.", "Jeg unngår å ta æren, selv når jeg fortjener det.", "Jeg snakker ofte før jeg får tenkt meg om.",
+    "Jeg er åpen for verdier som er annerledes enn mine egne.", "Jeg dobbeltsjekker alltid arbeidet mitt.", "Jeg ler ofte høyt.", "Jeg føler sterk empati for mennesker som lider.", "Jeg føler meg ofte hjelpeløs når jeg møter motgang.",
+
+    // RUNDE 4 (Spørsmål 91-120)
+    "Jeg foretrekker det konkrete fremfor det fantasifulle.", "Jeg mangler ofte selvtillit i arbeidet mitt.", "Jeg holder avstand til andre mennesker.", "Jeg er forsiktig med å stole på folk.", "Jeg slapper lett av i de fleste situasjoner.",
+    "Jeg legger sjelden merke til design og estetikk.", "Jeg lar ofte tingene mine ligge og slenge.", "Jeg foretrekker å tilbringe helgen alene.", "Jeg kunne tenke meg å jukse hvis jeg ikke ble tatt.", "Jeg er en veldig rolig og avbalansert person.",
+    "Jeg synes det er bortkastet tid å snakke om følelser.", "Jeg skulker unna oppgaver hvis jeg kan.", "Jeg lar andre lede gruppesamarbeid.", "Jeg setter mine egne behov langt foran andres.", "Jeg er generelt veldig fornøyd med meg selv.",
+    "Jeg holder meg utelukkende til velprøvde rutiner.", "Jeg tar livet som det kommer uten å planlegge.", "Jeg blir fort sliten og trenger mye hvile.", "Jeg elsker en god og opphetet diskusjon.", "Jeg føler meg veldig komfortabel i fremmede situasjoner.",
+    "Jeg liker å dypdykke i komplekse, teoretiske emner.", "Jeg gir lett opp når en oppgave blir vanskelig.", "Jeg foretrekker trygge, forutsigbare aktiviteter.", "Jeg liker å la andre vite hvor dyktig jeg er.", "Jeg kjøper ofte ting på impuls.",
+    "Jeg mener at gamle, tradisjonelle verdier er de beste.", "Jeg samler all nødvendig informasjon før jeg handler.", "Jeg er kjent som en energisk og munter person.", "Jeg prøver alltid å forstå den andres side av saken.", "Jeg håndterer motgang på en utmerket måte.",
+
+    // RIASEC (Spørsmål 121-150)
     "Jeg liker å reparere ting og jobbe praktisk med hendene.", "Jeg trives med å bruke verktøy, maskiner eller utstyr.", "Jeg foretrekker fysisk arbeid utendørs fremfor å sitte på et kontor.", "Jeg er interessert i hvordan motorer eller elektronikk fungerer.", "Jeg liker å bygge ting fra bunnen av.",
     "Jeg trives med å analysere data for å finne logiske mønstre.", "Jeg liker å lese vitenskapelige artikler eller løse komplekse gåter.", "Jeg foretrekker å utføre eksperimenter for å teste ut hypoteser.", "Jeg trives med å programmere eller lære om ny teknologi.", "Jeg liker å fordype meg i kompliserte tekniske eller matematiske problemer.",
     "Jeg uttrykker meg gjerne gjennom kunst, musikk eller skriving.", "Jeg trives med å designe visuelle elementer, som grafikk eller interiør.", "Jeg liker å opptre foran et publikum (teater, musikk, tale).", "Jeg setter pris på arbeidsoppgaver hvor jeg kan bruke min kreativitet og fantasi.", "Jeg unngår yrker som har strenge, rigide regler for hvordan ting skal gjøres.",
@@ -259,8 +268,10 @@ const App = () => {
     ];
 
     const rawFacets = [[0,0,0,0,0,0], [0,0,0,0,0,0], [0,0,0,0,0,0], [0,0,0,0,0,0], [0,0,0,0,0,0]];
-    const reversedIndices = [18, 50, 52, 53, 58, 69, 78, 83, 103, 108];
-
+    const reversedIndices = [
+  31, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59,
+  90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 111, 112, 113, 115, 119
+    ];
     finalAnswers.forEach((ans, idx) => {
       if (idx < 120) {
         const d = idx % 5;
