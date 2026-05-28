@@ -8,8 +8,7 @@ import {
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from 'firebase/auth';
 import { getFirestore, doc, setDoc, getDoc } from 'firebase/firestore';
-import html2canvas from 'html2canvas';
-import { jsPDF } from 'jspdf';
+
 
 // Initialiser Firebase
 let auth = null;
@@ -189,146 +188,36 @@ const App = () => {
     "Jeg foretrekker arbeid som krever nøyaktighet og strukturert organisering.", "Jeg liker å administrere budsjetter og holde system i dokumenter.", "Jeg trives best når jeg har tydelige instrukser og faste rutiner å følge.", "Jeg liker å jobbe med regneark (Excel) og arkiveringssystemer.", "Jeg er flink til å oppdage skrivefeil og detaljfeil i tekster eller tall."
   ];
 
-  async function handlePdfExport() {
+  function handlePdfExport() {
     setIsGeneratingPDF(true);
 
-    try {
-      const element = document.getElementById('pdf-content');
-      if (!element) {
-        throw new Error('PDF-innhold ikke funnet');
-      }
-
-      // Skjul elementer som skal utelates fra PDF
-      const ignoreElements = element.querySelectorAll('.html2pdf-ignore');
-      ignoreElements.forEach(el => el.style.display = 'none');
-
-      // Konverter DOM til canvas
-      const canvas = await html2canvas(element, {
-        scale: 2,
-        useCORS: true,
-        logging: false,
-        backgroundColor: '#ffffff',
-        allowTaint: true,
-        removeContainer: true,
-        useCors: true,
-        ignoreElements: (el) => {
-          // Ignore iframes and certain problematic elements
-          return el.tagName === 'IFRAME';
-        },
-        onclone: (clonedDocument) => {
-          // NEW APPROACH: Convert ALL computed styles to inline RGB/HEX before html2canvas renders
-          // This completely bypasses Tailwind's oklch color functions
-          
-          const convertColorToRgb = (color) => {
-            if (!color || color === 'transparent') return color;
-            
-            // If it's already rgb/hex, return as-is
-            if (color.startsWith('rgb') || color.startsWith('#') || color.startsWith('hsl')) {
-              return color;
-            }
-            
-            // oklch/oklab - convert to readable fallback colors
-            if (color.includes('oklch') || color.includes('oklab')) {
-              // Use a reasonable gray for oklch/oklab that we can't parse
-              return 'rgb(100, 100, 100)';
-            }
-            
-            return color;
-          };
-          
-          // Walk entire DOM and convert all computed colors to inline RGB styles
-          const allElements = clonedDocument.querySelectorAll('*');
-          allElements.forEach(el => {
-            const computed = clonedDocument.defaultView.getComputedStyle(el);
-            
-            // Get all color-related properties
-            const backgroundColor = computed.backgroundColor;
-            const color = computed.color;
-            const borderColor = computed.borderColor;
-            const borderTopColor = computed.borderTopColor;
-            const borderRightColor = computed.borderRightColor;
-            const borderBottomColor = computed.borderBottomColor;
-            const borderLeftColor = computed.borderLeftColor;
-            
-            // Convert and apply as inline styles
-            if (backgroundColor && backgroundColor !== 'rgba(0, 0, 0, 0)') {
-              el.style.backgroundColor = convertColorToRgb(backgroundColor);
-            }
-            if (color) {
-              el.style.color = convertColorToRgb(color);
-            }
-            if (borderColor && borderColor !== 'rgba(0, 0, 0, 0)') {
-              el.style.borderColor = convertColorToRgb(borderColor);
-            }
-            
-            // Also process individual border sides
-            if (borderTopColor && borderTopColor !== 'rgba(0, 0, 0, 0)') {
-              el.style.borderTopColor = convertColorToRgb(borderTopColor);
-            }
-            if (borderRightColor && borderRightColor !== 'rgba(0, 0, 0, 0)') {
-              el.style.borderRightColor = convertColorToRgb(borderRightColor);
-            }
-            if (borderBottomColor && borderBottomColor !== 'rgba(0, 0, 0, 0)') {
-              el.style.borderBottomColor = convertColorToRgb(borderBottomColor);
-            }
-            if (borderLeftColor && borderLeftColor !== 'rgba(0, 0, 0, 0)') {
-              el.style.borderLeftColor = convertColorToRgb(borderLeftColor);
-            }
-          });
-          
-          // Remove all stylesheets to prevent html2canvas from encountering oklch
-          const stylesheets = clonedDocument.querySelectorAll('style, link[rel="stylesheet"]');
-          stylesheets.forEach(sheet => sheet.remove());
-          
-          // Inject minimal base CSS only
-          const baseCSS = clonedDocument.createElement('style');
-          baseCSS.textContent = `
-            * { margin: 0; padding: 0; box-sizing: border-box; }
-            body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
-          `;
-          clonedDocument.head.appendChild(baseCSS);
+    // Inject print-only styles that hide UI chrome and format for A4
+    const styleId = 'pdf-print-styles';
+    if (!document.getElementById(styleId)) {
+      const style = document.createElement('style');
+      style.id = styleId;
+      style.textContent = `
+        @media print {
+          .html2pdf-ignore { display: none !important; }
+          body { background: white !important; }
+          #pdf-content {
+            max-width: 100% !important;
+            background: white !important;
+            padding: 0 !important;
+            margin: 0 !important;
+          }
+          .page-break-inside-avoid { page-break-inside: avoid; break-inside: avoid; }
+          * { box-shadow: none !important; }
+          @page { size: A4 portrait; margin: 12mm 10mm; }
         }
-      });
-
-      // Beregn PDF-dimensjoner basert på canvas
-      const imgData = canvas.toDataURL('image/jpeg', 0.98);
-      const pdf = new jsPDF({
-        orientation: 'portrait',
-        unit: 'mm',
-        format: 'a4'
-      });
-
-      const pageWidth = pdf.internal.pageSize.getWidth();
-      const pageHeight = pdf.internal.pageSize.getHeight();
-      const imgWidth = pageWidth - 8; // 4mm margin på hver side
-      const imgHeight = (canvas.height * imgWidth) / canvas.width;
-
-      let heightLeft = imgHeight;
-      let position = 4; // 4mm fra toppen
-
-      // Legg til bilde(r) på PDF
-      pdf.addImage(imgData, 'JPEG', 4, position, imgWidth, imgHeight);
-      heightLeft -= pageHeight - 8;
-
-      // Legg til flere sider hvis nødvendig
-      while (heightLeft > 0) {
-        position = heightLeft - imgHeight;
-        pdf.addPage();
-        pdf.addImage(imgData, 'JPEG', 4, position, imgWidth, imgHeight);
-        heightLeft -= pageHeight;
-      }
-
-      // Lagre PDF
-      pdf.save('Introspeksjon_Resultat.pdf');
-
-      // Vis elementer igjen
-      ignoreElements.forEach(el => el.style.display = '');
-    } catch (error) {
-      console.error("Kunne ikke generere PDF:", error);
-      setErrorMessage('Feil ved generering av PDF. Prøv igjen.');
-    } finally {
-      setIsGeneratingPDF(false);
+      `;
+      document.head.appendChild(style);
     }
+
+    setTimeout(() => {
+      window.print();
+      setTimeout(() => { setIsGeneratingPDF(false); }, 1000);
+    }, 100);
   }
 
   const generateShareLink = async () => {
