@@ -8,6 +8,8 @@ import {
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from 'firebase/auth';
 import { getFirestore, doc, setDoc, getDoc } from 'firebase/firestore';
+import html2canvas from 'html2canvas';
+import { jsPDF } from 'jspdf';
 
 // Initialiser Firebase
 let auth = null;
@@ -191,59 +193,139 @@ const App = () => {
     setIsGeneratingPDF(true);
 
     try {
-      // 1. Last inn jsPDF først
-      if (typeof window.jspdf === 'undefined') {
-        await new Promise((resolve, reject) => {
-          const script = document.createElement('script');
-          script.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
-          script.onload = () => {
-            window.jsPDF = window.jspdf.jsPDF; 
-            resolve();
-          };
-          script.onerror = reject;
-          document.head.appendChild(script);
-        });
-      }
-
-      // 2. Last inn html2canvas-pro (Løser oklch problemet!)
-      if (typeof window.html2canvas === 'undefined') {
-        await new Promise((resolve, reject) => {
-          const script = document.createElement('script');
-          script.src = 'https://cdn.jsdelivr.net/npm/html2canvas-pro@1.0.27/dist/html2canvas.min.js';
-          script.onload = resolve;
-          script.onerror = reject;
-          document.head.appendChild(script);
-        });
-      }
-
-      // 3. Last inn ubundlet html2pdf
-      if (typeof window.html2pdf === 'undefined') {
-        await new Promise((resolve, reject) => {
-          const script = document.createElement('script');
-          script.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.min.js';
-          script.onload = resolve;
-          script.onerror = reject;
-          document.head.appendChild(script);
-        });
-      }
-
       const element = document.getElementById('pdf-content');
+      if (!element) {
+        throw new Error('PDF-innhold ikke funnet');
+      }
+
+      // Skjul elementer som skal utelates fra PDF
       const ignoreElements = element.querySelectorAll('.html2pdf-ignore');
       ignoreElements.forEach(el => el.style.display = 'none');
 
-      const opt = {
-        margin: 0.3,
-        filename: 'Introspeksjon_Resultat.pdf',
-        image: { type: 'jpeg', quality: 0.98 },
-        html2canvas: { scale: 2, useCORS: true, logging: false },
-        jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' }
-      };
+      // Konverter DOM til canvas
+      const canvas = await html2canvas(element, {
+        scale: 2,
+        useCORS: true,
+        logging: false,
+        backgroundColor: '#ffffff',
+        allowTaint: true,
+        removeContainer: true,
+        useCors: true,
+        ignoreElements: (el) => {
+          // Ignore iframes and certain problematic elements
+          return el.tagName === 'IFRAME';
+        },
+        onclone: (clonedDocument) => {
+          // NEW APPROACH: Convert ALL computed styles to inline RGB/HEX before html2canvas renders
+          // This completely bypasses Tailwind's oklch color functions
+          
+          const convertColorToRgb = (color) => {
+            if (!color || color === 'transparent') return color;
+            
+            // If it's already rgb/hex, return as-is
+            if (color.startsWith('rgb') || color.startsWith('#') || color.startsWith('hsl')) {
+              return color;
+            }
+            
+            // oklch/oklab - convert to readable fallback colors
+            if (color.includes('oklch') || color.includes('oklab')) {
+              // Use a reasonable gray for oklch/oklab that we can't parse
+              return 'rgb(100, 100, 100)';
+            }
+            
+            return color;
+          };
+          
+          // Walk entire DOM and convert all computed colors to inline RGB styles
+          const allElements = clonedDocument.querySelectorAll('*');
+          allElements.forEach(el => {
+            const computed = clonedDocument.defaultView.getComputedStyle(el);
+            
+            // Get all color-related properties
+            const backgroundColor = computed.backgroundColor;
+            const color = computed.color;
+            const borderColor = computed.borderColor;
+            const borderTopColor = computed.borderTopColor;
+            const borderRightColor = computed.borderRightColor;
+            const borderBottomColor = computed.borderBottomColor;
+            const borderLeftColor = computed.borderLeftColor;
+            
+            // Convert and apply as inline styles
+            if (backgroundColor && backgroundColor !== 'rgba(0, 0, 0, 0)') {
+              el.style.backgroundColor = convertColorToRgb(backgroundColor);
+            }
+            if (color) {
+              el.style.color = convertColorToRgb(color);
+            }
+            if (borderColor && borderColor !== 'rgba(0, 0, 0, 0)') {
+              el.style.borderColor = convertColorToRgb(borderColor);
+            }
+            
+            // Also process individual border sides
+            if (borderTopColor && borderTopColor !== 'rgba(0, 0, 0, 0)') {
+              el.style.borderTopColor = convertColorToRgb(borderTopColor);
+            }
+            if (borderRightColor && borderRightColor !== 'rgba(0, 0, 0, 0)') {
+              el.style.borderRightColor = convertColorToRgb(borderRightColor);
+            }
+            if (borderBottomColor && borderBottomColor !== 'rgba(0, 0, 0, 0)') {
+              el.style.borderBottomColor = convertColorToRgb(borderBottomColor);
+            }
+            if (borderLeftColor && borderLeftColor !== 'rgba(0, 0, 0, 0)') {
+              el.style.borderLeftColor = convertColorToRgb(borderLeftColor);
+            }
+          });
+          
+          // Remove all stylesheets to prevent html2canvas from encountering oklch
+          const stylesheets = clonedDocument.querySelectorAll('style, link[rel="stylesheet"]');
+          stylesheets.forEach(sheet => sheet.remove());
+          
+          // Inject minimal base CSS only
+          const baseCSS = clonedDocument.createElement('style');
+          baseCSS.textContent = `
+            * { margin: 0; padding: 0; box-sizing: border-box; }
+            body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+          `;
+          clonedDocument.head.appendChild(baseCSS);
+        }
+      });
 
-      await window.html2pdf().set(opt).from(element).save();
+      // Beregn PDF-dimensjoner basert på canvas
+      const imgData = canvas.toDataURL('image/jpeg', 0.98);
+      const pdf = new jsPDF({
+        orientation: 'portrait',
+        unit: 'mm',
+        format: 'a4'
+      });
 
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      const imgWidth = pageWidth - 8; // 4mm margin på hver side
+      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+
+      let heightLeft = imgHeight;
+      let position = 4; // 4mm fra toppen
+
+      // Legg til bilde(r) på PDF
+      pdf.addImage(imgData, 'JPEG', 4, position, imgWidth, imgHeight);
+      heightLeft -= pageHeight - 8;
+
+      // Legg til flere sider hvis nødvendig
+      while (heightLeft > 0) {
+        position = heightLeft - imgHeight;
+        pdf.addPage();
+        pdf.addImage(imgData, 'JPEG', 4, position, imgWidth, imgHeight);
+        heightLeft -= pageHeight;
+      }
+
+      // Lagre PDF
+      pdf.save('Introspeksjon_Resultat.pdf');
+
+      // Vis elementer igjen
       ignoreElements.forEach(el => el.style.display = '');
     } catch (error) {
       console.error("Kunne ikke generere PDF:", error);
+      setErrorMessage('Feil ved generering av PDF. Prøv igjen.');
     } finally {
       setIsGeneratingPDF(false);
     }
@@ -436,6 +518,134 @@ const App = () => {
     generateInsights(randomAnswers, true);
   }
 
+  function loadMockResults() {
+    const mockResults = {
+      personality: {
+        intro: "Du er en balansert person med sterke analytiske evner kombinert med høy emosjonell intelligens. Din profil viser en pragmatisk tilnærming til livet med god selvbevissthet.",
+        traits: [
+          {
+            name: "Åpenhet",
+            score: 72,
+            desc: "Du er åpen for nye ideer, erfaringer og perspektiver. Du verdsetter kreativitet og har en naturlig nysgjerrighet.",
+            aspects: [
+              { name: "Intellekt", score: 78, desc: "Sterke analytiske ferdigheter og filosofisk tankegang." },
+              { name: "Åpenhet for opplevelser", score: 68, desc: "Du søker variasjon og liker å utforske nye muligheter." }
+            ],
+            facets: [
+              { name: "Fantasi", score: 75, desc: "Livlig fantasi og drømmende natur." },
+              { name: "Estetikk", score: 71, desc: "Setter pris på kunst og skjønnhet." },
+              { name: "Følelser", score: 68, desc: "Dypt følelsesliv og emosjonell bevissthet." },
+              { name: "Variasjonssøken", score: 70, desc: "Søker eksitasjon og variasjon." },
+              { name: "Intellekt", score: 78, desc: "Akademisk interessert og refleksiv." },
+              { name: "Frisinnethet", score: 65, desc: "Åpen for nye verdier og ideer." }
+            ]
+          },
+          {
+            name: "Planmessighet",
+            score: 65,
+            desc: "Du balanserer struktur med fleksibilitet. Du kan være organisert når det er nødvendig, men godtar også spontanitet.",
+            aspects: [
+              { name: "Gjennomføringsevne", score: 68, desc: "Arbeider systematisk mot mål." },
+              { name: "Orden", score: 62, desc: "Moderat ordensans, ikke rigid." }
+            ],
+            facets: [
+              { name: "Kompetanse", score: 70, desc: "Tror på egne evner." },
+              { name: "Orden", score: 60, desc: "Rimelig organisert." },
+              { name: "Pliktoppfyllende", score: 68, desc: "Tar ansvar seriøst." },
+              { name: "Målrettethet", score: 70, desc: "Fokusert på langsiktige mål." },
+              { name: "Selvdisiplin", score: 62, desc: "God selvkontroll med unntak for." },
+              { name: "Betenksomhet", score: 58, desc: "Kan være impulsiv av og til." }
+            ]
+          },
+          {
+            name: "Ekstroversjon",
+            score: 58,
+            desc: "Du er verken særlig ekstrovert eller introvert. Du trives både med sosiale aktiviteter og alenetid.",
+            aspects: [
+              { name: "Entusiasme", score: 62, desc: "Optimistisk og energisk innstilling." },
+              { name: "Selvmarkering", score: 54, desc: "Moderat behov for oppmerksomhet." }
+            ],
+            facets: [
+              { name: "Varme", score: 60, desc: "Varm og venlig mot andre." },
+              { name: "Sosiabilitet", score: 58, desc: "Liker sosial kontakt i moderate mengder." },
+              { name: "Selvmarkering", score: 55, desc: "Ikke sterkt behov for å dominere." },
+              { name: "Aktivitetsnivå", score: 62, desc: "Moderat energi og aktivitetsnivå." },
+              { name: "Spenningssøken", score: 56, desc: "Noe interesse for spenning." },
+              { name: "Entusiasme", score: 62, desc: "Viser glede og entusiasme." }
+            ]
+          },
+          {
+            name: "Medmenneskelighet",
+            score: 74,
+            desc: "Du er omsorgsfullt og altrueistisk. Du har høyt empatinivå og verdsetter harmoniske forhold.",
+            aspects: [
+              { name: "Empati", score: 76, desc: "Stor medfølelse og forståelse for andre." },
+              { name: "Høflighet", score: 72, desc: "Høflig og samarbeidsvillig person." }
+            ],
+            facets: [
+              { name: "Tillit", score: 74, desc: "Stoler på andre mennesker." },
+              { name: "Ærlighet", score: 72, desc: "Verdier åpenhet og sannhet." },
+              { name: "Altruisme", score: 78, desc: "Hjelpsom og omsorgsfull." },
+              { name: "Føyelighet", score: 70, desc: "Samarbeidsvillig innstilling." },
+              { name: "Beskjedenhet", score: 68, desc: "Ikke arrogant eller selvopptatt." },
+              { name: "Medsyn", score: 76, desc: "Viser omsorg for andres velferd." }
+            ]
+          },
+          {
+            name: "Nevrotisisme",
+            score: 42,
+            desc: "Du er emosjonelt stabil med god håndtering av stress. Du er ikke tilbøyelig til angst eller depresjon.",
+            aspects: [
+              { name: "Temperament", score: 38, desc: "Rolig og avbalansert temperament." },
+              { name: "Sårbarhet", score: 44, desc: "Moderat stressresistens." }
+            ],
+            facets: [
+              { name: "Angst", score: 40, desc: "Ikke særlig angstfull av natur." },
+              { name: "Temperament", score: 38, desc: "Sjelden sint eller irritert." },
+              { name: "Nedstemthet", score: 45, desc: "Generelt positiv livssynsvinkel." },
+              { name: "Selvbevissthet", score: 42, desc: "Moderat selvbevissthet." },
+              { name: "Impulsivitet", score: 46, desc: "Rimelig impulskontroll." },
+              { name: "Sårbarhet", score: 44, desc: "Håndterer stress bra." }
+            ]
+          }
+        ]
+      },
+      strengths: [
+        "Emosjonell intelligens og høy empati",
+        "Analytisk tenkemåte og problemløsningsevner",
+        "Balansert og fleksibel tilnærming til livet",
+        "Evne til dype og meningsfulle relasjoner",
+        "Stabil følelsesmessig grunnlag"
+      ],
+      weaknesses: [
+        "Kan noen ganger være for tillitsfullt innstilt",
+        "Ikke alltid tilstrekkelig selvreklame",
+        "Kan ha vanskelig med å ta tøffe beslutninger",
+        "Noen ganger mangler fokus på egne behov",
+        "Kan være usikker i ledelsessituasjoner"
+      ],
+      romance: {
+        ideal: "Du søker en partner som verdsetter dybde og autentisitet. En person som både kan dele intellektuelle diskusjoner og følelsesmessig intimitet.",
+        avoid: [
+          "Manipulativ eller uærlig oppførsel",
+          "Følelsesmessig unavailable eller kald",
+          "Kontrollerende eller aggressive trekk",
+          "Mangel på interesse i personlig vekst"
+        ]
+      },
+      riasec: {
+        profile: "IAS",
+        desc: "Du passer best i roller som kombinerer analytisk arbeid med menneskeorientert interaksjon. Ideelt: forsknings-, rådgivnings-, eller undervisningsstillinger."
+      },
+      aiCareerAnalysis: "Din profil passer godt til karrierer som:\n\n1. Psykolog eller terapeut - kombinerer din empati med analytiske evner\n2. Forsker eller akademiker - tiltrekker av dine intellektuelle interesser\n3. UX-designer eller brukersentrert designer - din forståelse av mennesker er verdifull\n4. Konsulent - du kan analysere problemer og forstå menneskelige aspekter\n5. Lærer eller mentor - naturlig kommunikator med omsorgsfullt fokus\n\nDu bør unngå rene tekniske roller eller høyt konkurranseorienterte posisjoner som ikke gir rom for medmenneskelighet."
+    };
+
+    setResults(mockResults);
+    setAppState('dashboard');
+    setTestType('extended_riasec');
+    setIncludeRiasec(true);
+  }
+
   function startTest(type, resume = false) {
     if (resume && savedProgress) {
       setTestType(savedProgress.type); setMaxQuestions(savedProgress.maxQuestions); setIncludeRiasec(savedProgress.includeRiasec);
@@ -530,6 +740,12 @@ const App = () => {
         className="mt-8 text-xs font-mono text-gray-400 hover:text-indigo-600 transition-colors w-full text-center"
       >
         [ DEV: Generer tilfeldig test (150 svar) ]
+      </button>
+      <button 
+        onClick={loadMockResults} 
+        className="mt-2 text-xs font-mono text-gray-400 hover:text-indigo-600 transition-colors w-full text-center"
+      >
+        [ DEV: Last mock resultat (PDF test) ]
       </button>
         </div>
       </div>
