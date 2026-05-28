@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Brain, Briefcase, Heart, Lightbulb, Target, AlertCircle,
-  GraduationCap, ChevronDown, ChevronUp, RefreshCcw, Copy,
-  Check, Zap, FileText, Compass, BarChart, ArrowLeft, Loader2,
+  GraduationCap, ChevronDown, ChevronUp, RefreshCcw, Check,
+  Zap, FileText, Compass, BarChart, ArrowLeft, Loader2,
   Users, X, Download, Link as LinkIcon
 } from 'lucide-react';
 import { initializeApp } from 'firebase/app';
@@ -98,7 +98,6 @@ const App = () => {
   const [includeRiasec, setIncludeRiasec] = useState(false);
   const [results, setResults] = useState(null);
   const [errorMessage, setErrorMessage] = useState("");
-  const [loadingAttempt, setLoadingAttempt] = useState(1);
   const [copiedLink, setCopiedLink] = useState(false);
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
 
@@ -108,13 +107,11 @@ const App = () => {
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [savedProgress, setSavedProgress] = useState(null);
 
-  // Autentisering & Databaser
   const [user, setUser] = useState(null);
   const [loadingCache, setLoadingCache] = useState(true);
 
-  // Kompatibilitet Dele-lenke funksjonalitet
   const [matchId, setMatchId] = useState(null);
-  const [matchData, setMatchData] = useState(null); 
+  const [matchData, setMatchData] = useState(null);
   const [isCompatModalOpen, setIsCompatModalOpen] = useState(false);
   const [compatAnalysis, setCompatAnalysis] = useState(null);
   const [isAnalyzingCompat, setIsAnalyzingCompat] = useState(false);
@@ -122,17 +119,7 @@ const App = () => {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const mId = params.get('match');
-
-    // Decode base64-encoded partner traits from URL (set by generateShareLink)
-    if (mId) {
-      try {
-        const decoded = JSON.parse(decodeURIComponent(atob(mId)));
-        setMatchData(decoded);
-        setMatchId(mId);
-      } catch (e) {
-        console.error("Ugyldig match-parameter i URL:", e);
-      }
-    }
+    if (mId) setMatchId(mId);
 
     const saved = localStorage.getItem('introspectionProgress');
     if (saved) setSavedProgress(JSON.parse(saved));
@@ -204,13 +191,13 @@ const App = () => {
     setIsGeneratingPDF(true);
 
     try {
-      // 1. last inn jsPDF først
+      // 1. Last inn jsPDF først
       if (typeof window.jspdf === 'undefined') {
         await new Promise((resolve, reject) => {
           const script = document.createElement('script');
           script.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
           script.onload = () => {
-            window.jsPDF = window.jspdf.jsPDF; // html2pdf forventer dette navn
+            window.jsPDF = window.jspdf.jsPDF; 
             resolve();
           };
           script.onerror = reject;
@@ -218,7 +205,7 @@ const App = () => {
         });
       }
 
-      // 2. last inn html2canvas-pro (Denne LØSER oklch-problemet!)
+      // 2. Last inn html2canvas-pro (Løser oklch problemet!)
       if (typeof window.html2canvas === 'undefined') {
         await new Promise((resolve, reject) => {
           const script = document.createElement('script');
@@ -229,7 +216,7 @@ const App = () => {
         });
       }
 
-      // 3. last inn den UBUNDTEDE html2pdf (som nå tvinges til å bruke pro-versionen ovenfor)
+      // 3. Last inn ubundlet html2pdf
       if (typeof window.html2pdf === 'undefined') {
         await new Promise((resolve, reject) => {
           const script = document.createElement('script');
@@ -254,7 +241,6 @@ const App = () => {
 
       await window.html2pdf().set(opt).from(element).save();
 
-      // Ryd op og vis knapperne igen
       ignoreElements.forEach(el => el.style.display = '');
     } catch (error) {
       console.error("Kunne ikke generere PDF:", error);
@@ -263,13 +249,13 @@ const App = () => {
     }
   }
 
-  const generateShareLink = () => {
-    if (!results) return;
+  const generateShareLink = async () => {
+    if (!user || !db || !results) return;
     try {
-      // Encode only name+score to keep URL short; descriptions not needed for compat analysis
-      const minimal = results.personality.traits.map(t => ({ name: t.name, score: t.score }));
-      const encoded = btoa(encodeURIComponent(JSON.stringify(minimal)));
-      const url = `${window.location.origin}${window.location.pathname}?match=${encoded}`;
+      const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'profiles', user.uid);
+      await setDoc(docRef, { traits: results.personality.traits });
+      
+      const url = `${window.location.origin}${window.location.pathname}?match=${user.uid}`;
       navigator.clipboard.writeText(url);
       setCopiedLink(true);
       setTimeout(() => setCopiedLink(false), 3000);
@@ -323,7 +309,7 @@ const App = () => {
       return Math.max(1, Math.min(99, Math.round((z < 0 ? 1.0 - p : p) * 100)));
     };
 
-    // Bygg opp objektet med de EKTAKTE matematiske verdiene først
+    // Bygg opp objektet med de EKSAKTE matematiske verdiene først
     const calculatedTraits = domainsInfo.map((dom, dIdx) => {
       let dScoreRaw = 0;
       
@@ -348,7 +334,6 @@ const App = () => {
       };
     });
 
-    // Send dataene til AI kun for å hente ut beskrivende tekster
     let promptString = calculatedTraits.map(t => {
       return `Trekk: ${t.name} (${t.score} %)\n` + 
              t.aspects.map(a => ` - Aspekt: ${a.name} (${a.score} %)\n`).join('') +
@@ -356,7 +341,7 @@ const App = () => {
     }).join('\n');
 
     const prompt = `Du er en ekspert i psykometri. Du skal utelukkende skrive profesjonelle, innsiktsfulle tolkninger for disse eksakte dataene:\n${promptString}\n${withRiasec ? `RIASEC: ${riasecString}` : ''}\n
-    Returner et JSON-objekt som følger skjemaet nøyaktig. Du må IKKE endre noen av tallene eller navnene i 'personality'. Din eneste jobb er å fylle ut 'desc' og 'intro'.`;
+    Returner et JSON-objekt som følger skjemaet nøyaktig. Din eneste jobb er å fylle ut 'desc' og 'intro'. IKKE endre navn.`;
 
     const payload = {
       contents: [{ parts: [{ text: prompt }] }],
@@ -370,47 +355,78 @@ const App = () => {
                 traits: {
                   type: "ARRAY", items: {
                     type: "OBJECT", properties: {
-                      name: { type: "STRING" }, score: { type: "INTEGER" }, desc: { type: "STRING" },
-                      aspects: { type: "ARRAY", items: { type: "OBJECT", properties: { name: { type: "STRING" }, score: { type: "INTEGER" }, desc: { type: "STRING" } }, required: ["name", "score", "desc"] } },
-                      facets: { type: "ARRAY", items: { type: "OBJECT", properties: { name: { type: "STRING" }, score: { type: "INTEGER" }, desc: { type: "STRING" } }, required: ["name", "score", "desc"] } }
-                    }, required: ["name", "score", "desc", "aspects", "facets"]
+                      name: { type: "STRING" }, desc: { type: "STRING" },
+                      aspects: { type: "ARRAY", items: { type: "OBJECT", properties: { name: { type: "STRING" }, desc: { type: "STRING" } }, required: ["name", "desc"] } },
+                      facets: { type: "ARRAY", items: { type: "OBJECT", properties: { name: { type: "STRING" }, desc: { type: "STRING" } }, required: ["name", "desc"] } }
+                    }, required: ["name", "desc", "aspects", "facets"]
                   }
                 }
               }, required: ["intro", "traits"]
             }, strengths: { type: "ARRAY", items: { type: "STRING" } }, weaknesses: { type: "ARRAY", items: { type: "STRING" } },
             romance: { type: "OBJECT", properties: { ideal: { type: "STRING" }, avoid: { type: "ARRAY", items: { type: "STRING" } } }, required: ["ideal", "avoid"] },
-            riasec: { type: "OBJECT", properties: { profile: { type: "STRING" }, desc: { type: "STRING" } } }, aiCareerAnalysis: { type: "STRING" }
+            riasec: { type: "OBJECT", properties: { desc: { type: "STRING" } } }, aiCareerAnalysis: { type: "STRING" }
           }, required: ["personality", "strengths", "weaknesses", "romance", "aiCareerAnalysis"]
         }
       }
     };
 
-    try {
-      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-      const data = await response.json();
-      const parsedData = JSON.parse(data.candidates[0].content.parts[0].text.replace(/```json/g, '').replace(/```/g, '').trim());
-      
-      // Force-injiser de ekte kalkulerte tallene tilbake i JSON-objektet før lagring
-      calculatedTraits.forEach((t, dIdx) => {
-        if(parsedData.personality.traits[dIdx]) {
-          parsedData.personality.traits[dIdx].score = t.score;
-          t.aspects.forEach((a, aIdx) => {
-            if(parsedData.personality.traits[dIdx].aspects[aIdx]) parsedData.personality.traits[dIdx].aspects[aIdx].score = a.score;
+    let attempt = 0, delay = 1000, success = false;
+    while (attempt < 3 && !success) {
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 60000);
+        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload), signal: controller.signal });
+        clearTimeout(timeoutId);
+        
+        const data = await response.json();
+        if (!response.ok) throw new Error(data?.error?.message || `HTTP Feil ${response.status}`);
+        
+        const parsedData = JSON.parse(data.candidates[0].content.parts[0].text.replace(/```json/g, '').replace(/```/g, '').trim());
+        
+        // --- DETTE LØSER PROBLEMET ---
+        // Vi tvinger inn våre egne matematiske utregninger, og plukker KUN ut tekstene fra AI ved å koble sammen på eksakt 'navn'
+        const finalTraits = calculatedTraits.map(calcTrait => {
+          // Finn matchende trekk fra AI
+          const aiTrait = parsedData.personality?.traits?.find(t => t.name.toLowerCase() === calcTrait.name.toLowerCase()) || {};
+
+          // Knytt sammen aspekter basert på navn
+          const finalAspects = calcTrait.aspects.map(calcAsp => {
+            const aiAsp = aiTrait.aspects?.find(a => a.name.toLowerCase() === calcAsp.name.toLowerCase()) || {};
+            return { name: calcAsp.name, score: calcAsp.score, desc: aiAsp.desc || "Beskrivelse mangler." };
           });
-          t.facets.forEach((f, fIdx) => {
-            if(parsedData.personality.traits[dIdx].facets[fIdx]) parsedData.personality.traits[dIdx].facets[fIdx].score = f.score;
+
+          // Knytt sammen fasetter basert på navn
+          const finalFacets = calcTrait.facets.map(calcFac => {
+            const aiFac = aiTrait.facets?.find(f => f.name.toLowerCase() === calcFac.name.toLowerCase()) || {};
+            return { name: calcFac.name, score: calcFac.score, desc: aiFac.desc || "Beskrivelse mangler." };
           });
+
+          return {
+            name: calcTrait.name,
+            score: calcTrait.score,
+            desc: aiTrait.desc || "Beskrivelse mangler.",
+            aspects: finalAspects,
+            facets: finalFacets
+          };
+        });
+
+        // Sett de ferdig-knyttede listene tilbake i resultatet
+        parsedData.personality.traits = finalTraits;
+
+        // Sikre at RIASEC ikke krasjer appen hvis AI glemmer den
+        if (withRiasec) {
+          if (!parsedData.riasec) parsedData.riasec = {};
+          parsedData.riasec.profile = riasecString;
+          parsedData.riasec.desc = parsedData.riasec.desc || "Karriereprofil kalkulert.";
         }
-      });
 
-      if (withRiasec && parsedData.riasec) {
-        parsedData.riasec.profile = riasecString;
+        setResults(parsedData); setAppState('dashboard'); success = true;
+        localStorage.setItem('introspectionResults', JSON.stringify({ results: parsedData, testType, includeRiasec }));
+      } catch (err) {
+        attempt++; if (attempt >= 3) { setErrorMessage(err.message); setAppState('error'); } else { await new Promise(r => setTimeout(r, delay)); delay *= 1.5; }
       }
-
-      setResults(parsedData); setAppState('dashboard');
-      localStorage.setItem('introspectionResults', JSON.stringify({ results: parsedData, testType, includeRiasec }));
-    } catch (err) { setErrorMessage(err.message); setAppState('error'); }
-  };};
+    }
+  };
   
   function generateRandomTest() {
     const randomAnswers = Array.from({ length: 150 }, () => Math.floor(Math.random() * 5) + 1);
