@@ -277,10 +277,9 @@ const App = () => {
   };
 
   const generateInsights = async (finalAnswers, withRiasec) => {
-    setAppState('analyzing'); setErrorMessage(""); setLoadingAttempt(1);
-    localStorage.removeItem('introspectionProgress');
-
-    // 1. RIASEC
+    setAppState('analyzing'); setErrorMessage(""); 
+    
+    // 1. RIASEC kalkulering
     const rKeys = ['R', 'I', 'A', 'S', 'E', 'C'];
     const rScores = { R: 0, I: 0, A: 0, S: 0, E: 0, C: 0 };
     finalAnswers.forEach((ans, idx) => {
@@ -293,24 +292,24 @@ const App = () => {
       riasecString = sortedRiasec.slice(0, 3).map(arr => arr[0]).join('');
     }
 
-    // 2. MATEMATISK BEREGNING AV DE 30 FASETTENE (Big Five)
+    // 2. KORREKT STRUKTURERT PSYKOMETRISK MOTOR
     const domainsInfo = [
-      { name: 'Åpenhet', aspects: [{ name: 'Intellekt', f: [0, 4] }, { name: 'Åpenhet for opplevelser', f: [1, 2, 3, 5] }], facets: ['Fantasi', 'Estetikk', 'Følelser', 'Variasjonssøken', 'Intellekt', 'Frisinnethet'] },
+      { name: 'Åpenhet', aspects: [{ name: 'Intellekt', f: [4] }, { name: 'Åpenhet for opplevelser', f: [0, 1, 2, 3, 5] }], facets: ['Fantasi', 'Estetikk', 'Følelser', 'Variasjonssøken', 'Intellekt', 'Frisinnethet'] },
       { name: 'Planmessighet', aspects: [{ name: 'Gjennomføringsevne', f: [0, 3, 4] }, { name: 'Orden', f: [1, 2, 5] }], facets: ['Kompetanse', 'Orden', 'Pliktoppfyllende', 'Målrettethet', 'Selvdisiplin', 'Betenksomhet'] },
       { name: 'Ekstroversjon', aspects: [{ name: 'Entusiasme', f: [0, 1, 5] }, { name: 'Selvmarkering', f: [2, 3, 4] }], facets: ['Varme', 'Sosiabilitet', 'Selvmarkering', 'Aktivitetsnivå', 'Spenningssøken', 'Entusiasme'] },
       { name: 'Medmenneskelighet', aspects: [{ name: 'Empati', f: [0, 2, 5] }, { name: 'Høflighet', f: [1, 3, 4] }], facets: ['Tillit', 'Ærlighet', 'Altruisme', 'Føyelighet', 'Beskjedenhet', 'Medsyn'] },
-      { name: 'Nevrotisisme', aspects: [{ name: 'Temperament', f: [1, 4] }, { name: 'Sårbarhet', f: [0, 2, 3, 5] }], facets: ['Angst', 'Temperament', 'Nedstemthet', 'Selvbevissthet', 'Impulsivitet', 'Sårbarhet'] }
+      { name: 'Nevrotisisme', aspects: [{ name: 'Temperament', f: [1] }, { name: 'Sårbarhet', f: [0, 2, 3, 4, 5] }], facets: ['Angst', 'Temperament', 'Nedstemthet', 'Selvbevissthet', 'Impulsivitet', 'Sårbarhet'] }
     ];
 
     const rawFacets = [[0,0,0,0,0,0], [0,0,0,0,0,0], [0,0,0,0,0,0], [0,0,0,0,0,0], [0,0,0,0,0,0]];
-    const reversedIndices = [18, 50, 52, 53, 58, 69, 78, 83, 103, 108]; // Enkel reverseringsnøkkel for økt nøyaktighet
+    const reversedIndices = [18, 50, 52, 53, 58, 69, 78, 83, 103, 108];
 
     finalAnswers.forEach((ans, idx) => {
       if (idx < 120) {
         const d = idx % 5;
         const f = Math.floor(idx / 5) % 6;
         let val = ans;
-        if (reversedIndices.includes(idx)) val = 6 - ans; // Reverser skalaen
+        if (reversedIndices.includes(idx)) val = 6 - ans;
         rawFacets[d][f] += val;
       }
     });
@@ -324,34 +323,40 @@ const App = () => {
       return Math.max(1, Math.min(99, Math.round((z < 0 ? 1.0 - p : p) * 100)));
     };
 
-    let profileDataString = "";
-    domainsInfo.forEach((dom, dIdx) => {
+    // Bygg opp objektet med de EKTAKTE matematiske verdiene først
+    const calculatedTraits = domainsInfo.map((dom, dIdx) => {
       let dScoreRaw = 0;
-      const aspectScores = dom.aspects.map(a => ({ name: a.name, raw: 0, max: a.f.length * 20 }));
-      const facetScores = dom.facets.map((fName, fIdx) => {
-         const raw = rawFacets[dIdx][fIdx];
-         dScoreRaw += raw;
-         dom.aspects.forEach((a, aIdx) => { if (a.f.includes(fIdx)) aspectScores[aIdx].raw += raw; });
-         return { name: fName, pct: calcPercentile(raw, 20) };
+      
+      const facets = dom.facets.map((fName, fIdx) => {
+        const raw = rawFacets[dIdx][fIdx];
+        dScoreRaw += raw;
+        return { name: fName, score: calcPercentile(raw, 20), desc: "" };
       });
 
-      profileDataString += `\nTrekk: ${dom.name} (Score: ${calcPercentile(dScoreRaw, 120)})\n`;
-      aspectScores.forEach(a => { profileDataString += `  Aspekt: ${a.name} (Score: ${calcPercentile(a.raw, a.max)})\n`; });
-      facetScores.forEach(f => { profileDataString += `    Fasett: ${f.name} (Score: ${f.pct})\n`; });
+      const aspects = dom.aspects.map(asp => {
+        let aspRaw = 0;
+        asp.f.forEach(fIdx => { aspRaw += rawFacets[dIdx][fIdx]; });
+        return { name: asp.name, score: calcPercentile(aspRaw, asp.f.length * 20), desc: "" };
+      });
+
+      return {
+        name: dom.name,
+        score: calcPercentile(dScoreRaw, 120),
+        desc: "",
+        aspects,
+        facets
+      };
     });
 
-    const prompt = `Du er en ekspert innen psykometri.
-    Jeg har kalkulert brukerens FAKTISKE, nøyaktige persentiler (1-99) basert på en 120-spørsmåls psykometrisk test:
-    ${profileDataString}
-    ${withRiasec ? `\nRIASEC Topp-profil: ${riasecString}` : ''}
+    // Send dataene til AI kun for å hente ut beskrivende tekster
+    let promptString = calculatedTraits.map(t => {
+      return `Trekk: ${t.name} (${t.score} %)\n` + 
+             t.aspects.map(a => ` - Aspekt: ${a.name} (${a.score} %)\n`).join('') +
+             t.facets.map(f => `   - Fasett: ${f.name} (${f.score} %)\n`).join('');
+    }).join('\n');
 
-    OPPGAVE:
-    Lag en utfyllende personlighetsprofil basert på disse eksakte dataene.
-    VIKTIG REGLER: 
-    1. Du SKAL bruke nøyaktig de samme navnene og scorene som er listet opp i dataene over for alle trekk, aspekter og fasetter. 
-    2. IKKE finn på egne score eller navn.
-    3. For hvert trekk, aspekt og fasett: Generer en treffende, profesjonell tekst ('desc') som forklarer resultatet.
-    4. Svar kun i JSON-formatet jeg har definert.`;
+    const prompt = `Du er en ekspert i psykometri. Du skal utelukkende skrive profesjonelle, innsiktsfulle tolkninger for disse eksakte dataene:\n${promptString}\n${withRiasec ? `RIASEC: ${riasecString}` : ''}\n
+    Returner et JSON-objekt som følger skjemaet nøyaktig. Du må IKKE endre noen av tallene eller navnene i 'personality'. Din eneste jobb er å fylle ut 'desc' og 'intro'.`;
 
     const payload = {
       contents: [{ parts: [{ text: prompt }] }],
@@ -380,27 +385,32 @@ const App = () => {
       }
     };
 
-    let attempt = 0, delay = 1000, success = false;
-    while (attempt < 3 && !success) {
-      try {
-        setLoadingAttempt(attempt + 1);
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 60000);
-        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload), signal: controller.signal });
-        clearTimeout(timeoutId);
-        const data = await response.json();
-        if (!response.ok) throw new Error(data?.error?.message || `HTTP Feil ${response.status}`);
-        const parsedData = JSON.parse(data.candidates[0].content.parts[0].text.replace(/```json/g, '').replace(/```/g, '').trim());
-        
-        setResults(parsedData); setAppState('dashboard'); success = true;
-        localStorage.setItem('introspectionResults', JSON.stringify({
-          results: parsedData, testType: testType, includeRiasec: withRiasec
-        }));
-      } catch (err) {
-        attempt++; if (attempt >= 3) { setErrorMessage(err.message); setAppState('error'); } else { await new Promise(r => setTimeout(r, delay)); delay *= 1.5; }
+    try {
+      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+      const data = await response.json();
+      const parsedData = JSON.parse(data.candidates[0].content.parts[0].text.replace(/```json/g, '').replace(/```/g, '').trim());
+      
+      // Force-injiser de ekte kalkulerte tallene tilbake i JSON-objektet før lagring
+      calculatedTraits.forEach((t, dIdx) => {
+        if(parsedData.personality.traits[dIdx]) {
+          parsedData.personality.traits[dIdx].score = t.score;
+          t.aspects.forEach((a, aIdx) => {
+            if(parsedData.personality.traits[dIdx].aspects[aIdx]) parsedData.personality.traits[dIdx].aspects[aIdx].score = a.score;
+          });
+          t.facets.forEach((f, fIdx) => {
+            if(parsedData.personality.traits[dIdx].facets[fIdx]) parsedData.personality.traits[dIdx].facets[fIdx].score = f.score;
+          });
+        }
+      });
+
+      if (withRiasec && parsedData.riasec) {
+        parsedData.riasec.profile = riasecString;
       }
-    }
-  };
+
+      setResults(parsedData); setAppState('dashboard');
+      localStorage.setItem('introspectionResults', JSON.stringify({ results: parsedData, testType, includeRiasec }));
+    } catch (err) { setErrorMessage(err.message); setAppState('error'); }
+  };};
   
   function generateRandomTest() {
     const randomAnswers = Array.from({ length: 150 }, () => Math.floor(Math.random() * 5) + 1);
