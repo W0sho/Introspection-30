@@ -117,43 +117,24 @@ const App = () => {
   const [compatAnalysis, setCompatAnalysis] = useState(null);
   const [isAnalyzingCompat, setIsAnalyzingCompat] = useState(false);
 
-  // 1. Logg inn brukeren anonymt i bakgrunnen (Kreves for å kunne dele lenke)
-  useEffect(() => {
-    if (auth) {
-      const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-        if (currentUser) {
-          setUser(currentUser);
-        } else {
-          signInAnonymously(auth).catch(console.error);
-        }
-      });
-      return () => unsubscribe();
-    }
-  }, []);
-
-  // 2. Hent vennens resultat fra Firebase hvis URL-en har en match-ID
-  useEffect(() => {
-    const fetchMatchData = async () => {
-      if (db && matchId) {
-        try {
-          const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'profiles', matchId);
-          const docSnap = await getDoc(docRef);
-          if (docSnap.exists()) {
-            setMatchData(docSnap.data().traits);
-          }
-        } catch (e) {
-          console.error("Kunne ikke hente match-data:", e);
-        }
-      }
-    };
-    fetchMatchData();
-  }, [matchId]);
-
-  // 1. initialisering (URL params, lokal Cache)
-  useEffect(() => {
+useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const mId = params.get('match');
-    if (mId) setMatchId(mId);
+    
+    if (mId) {
+      try {
+        // Dekoder 64-strengen fra URL-en
+        const decoded = decodeURIComponent(atob(mId));
+        const partnerTraits = decoded.split('|').map(item => {
+          const [name, score] = item.split(':');
+          return { name, score: parseInt(score) };
+        });
+        setMatchData(partnerTraits);
+        setMatchId('aktiv-match');
+      } catch(e) {
+        console.error("Ugyldig match-lenke");
+      }
+    }
 
     const saved = localStorage.getItem('introspectionProgress');
     if (saved) setSavedProgress(JSON.parse(saved));
@@ -263,16 +244,20 @@ const App = () => {
   }
 
   const generateShareLink = async () => {
-    if (!user || !db || !results) return;
+    if (!results) return;
     try {
-      const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'profiles', user.uid);
-      await setDoc(docRef, { traits: results.personality.traits });
+      // Pakker profilen inn i URL-en med Base64
+      const miniProfile = results.personality.traits.map(t => `${t.name}:${t.score}`).join('|');
+      const encodedProfile = btoa(encodeURIComponent(miniProfile)); 
       
-      const url = `${window.location.origin}${window.location.pathname}?match=${user.uid}`;
-      navigator.clipboard.writeText(url);
+      const url = `${window.location.origin}${window.location.pathname}?match=${encodedProfile}`;
+      await navigator.clipboard.writeText(url);
+      
       setCopiedLink(true);
       setTimeout(() => setCopiedLink(false), 3000);
-    } catch (e) { console.error("Kunne ikke lage delelenke", e); }
+    } catch (e) { 
+      console.error("Kunne ikke lage delelenke", e); 
+    }
   };
 
   const generateInsights = async (finalAnswers, withRiasec) => {
